@@ -223,7 +223,7 @@ const StaffDashboard = () => {
   }, [filters]);
 
   // Handle Quick Status Transition
-  const handleStatusTransition = async (appointmentId, nextStatus) => {
+  const handleStatusTransition = async (appointmentId, nextStatus, options = {}) => {
     try {
       const updated = await transitionAppointmentStatus(
         appointmentId,
@@ -235,8 +235,9 @@ const StaffDashboard = () => {
       setAppointments((prev) =>
         prev.map((a) => (a.appointment_id === appointmentId ? updated : a))
       );
-      if (selectedAptForHistory?.appointment_id === appointmentId) {
+      if (options.openHistory || nextStatus === 'Checked-In' || selectedAptForHistory?.appointment_id === appointmentId) {
         setSelectedAptForHistory(updated);
+        setHistoryModalOpen(true);
       }
       const newStats = await fetchAppointmentStatistics();
       setStatistics(newStats);
@@ -1004,14 +1005,14 @@ const StaffDashboard = () => {
                       {/* Actions using common/Button */}
                       <td className="td-actions-cell">
                         <div className="actions-structured-cell">
-                          {apt.status === 'Scheduled' && (
+                          {apt.status === 'Scheduled' ? (
                             <>
                               <div className="actions-row-primary">
                                 <Button
                                   variant="success"
                                   className="btn-act-primary"
-                                  onClick={() => handleStatusTransition(apt.appointment_id, 'Checked-In')}
-                                  title="Check-In patient and place into queue"
+                                  onClick={() => handleStatusTransition(apt.appointment_id, 'Checked-In', { openHistory: true })}
+                                  title="Check-In patient and view audit history"
                                 >
                                   Check-In
                                 </Button>
@@ -1054,97 +1055,7 @@ const StaffDashboard = () => {
                                 </Button>
                               </div>
                             </>
-                          )}
-
-                          {apt.status === 'Checked-In' && (
-                            <>
-                              <div className="actions-row-primary">
-                                <Button
-                                  variant="primary"
-                                  className="btn-act-primary btn-act-consult"
-                                  onClick={() => handleStatusTransition(apt.appointment_id, 'In-Consultation')}
-                                  title="Admit patient for consultation"
-                                >
-                                  Consult
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  className="btn-act-history"
-                                  onClick={() => {
-                                    setSelectedAptForHistory(apt);
-                                    setHistoryModalOpen(true);
-                                  }}
-                                  title="View audit trail"
-                                >
-                                  History
-                                </Button>
-                              </div>
-                              <div className="actions-row-secondary">
-                                <Button
-                                  variant="secondary"
-                                  className="btn-act-secondary btn-act-reschedule"
-                                  onClick={() => handleOpenRescheduleModal(apt)}
-                                  title="Reschedule date, time slot, or doctor"
-                                >
-                                  Reschedule
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  className="btn-act-secondary btn-act-cancel"
-                                  onClick={() => handleOpenCancelModal(apt)}
-                                  title="Cancel appointment and release slot"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  variant="danger"
-                                  className="btn-act-secondary btn-act-noshow"
-                                  onClick={() => handleStatusTransition(apt.appointment_id, 'No-Show')}
-                                  title="Mark as No-Show / Left"
-                                >
-                                  No-Show
-                                </Button>
-                              </div>
-                            </>
-                          )}
-
-                          {apt.status === 'In-Consultation' && (
-                            <>
-                              <div className="actions-row-primary">
-                                <Button
-                                  variant="success"
-                                  className="btn-act-primary"
-                                  onClick={() => handleStatusTransition(apt.appointment_id, 'Completed')}
-                                  title="Complete consultation"
-                                >
-                                  Complete
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  className="btn-act-history"
-                                  onClick={() => {
-                                    setSelectedAptForHistory(apt);
-                                    setHistoryModalOpen(true);
-                                  }}
-                                  title="View audit trail"
-                                >
-                                  History
-                                </Button>
-                              </div>
-                              <div className="actions-row-secondary">
-                                <Button
-                                  variant="secondary"
-                                  className="btn-act-secondary btn-act-cancel"
-                                  onClick={() => handleOpenCancelModal(apt)}
-                                  title="Abort and cancel appointment"
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            </>
-                          )}
-
-                          {['Completed', 'Cancelled', 'No-Show'].includes(apt.status) && (
+                          ) : (
                             <Button
                               variant="secondary"
                               className="btn-act-history-full"
