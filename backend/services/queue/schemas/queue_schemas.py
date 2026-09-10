@@ -36,3 +36,7 @@ class QueueToken(BaseModel):
     consultation_start_time: Optional[datetime] = None
     consultation_end_time: Optional[datetime] = None
     estimated_wait_minutes: int = 15
+
+
+class QueueStatusUpdateRequest(BaseModel):
+    status: QueueStatus
