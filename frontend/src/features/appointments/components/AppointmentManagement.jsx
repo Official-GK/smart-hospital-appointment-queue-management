@@ -91,7 +91,7 @@ function getStatusBadgeVariant(status) {
   }
 }
 
-const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
+const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 }) => {
   const [appointments, setAppointments] = useState([]);
   const [metadata, setMetadata] = useState({ statuses: [], departments: [], doctors: [], cancellation_reasons: [] });
   const [statistics, setStatistics] = useState(null);
@@ -154,33 +154,41 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     appointmentDate: '',
     appointmentTime: '',
     priority: 'Normal',
-    staffId: defaultStaffId,
     notes: '',
+    staffId: defaultStaffId,
   });
 
-  const showNotification = (message, type = 'success') => {
+  // Calculate Date Limits in Local Time
+  const todayDateObj = new Date();
+  const getLocalYYYYMMDD = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  const minDateLimit = getLocalYYYYMMDD(todayDateObj);
+  const maxDateObj = new Date();
+  maxDateObj.setDate(todayDateObj.getDate() + 5);
+  const maxDateLimit = getLocalYYYYMMDD(maxDateObj);
+
+  const showNotification = useCallback((message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
-  };
-
-  // Load Metadata & Statistics on Mount
-  useEffect(() => {
-    async function loadInitial() {
-      try {
-        const [metaData, statsData] = await Promise.all([
-          fetchFilterMetadata(),
-          fetchAppointmentStatistics(),
-        ]);
-        setMetadata(metaData);
-        setStatistics(statsData);
-      } catch (err) {
-        console.error('Failed to load initial metadata or stats:', err);
-      }
-    }
-    loadInitial();
   }, []);
 
-  // Load Appointments & Statistics
+  // Fetch Metadata on mount
+  useEffect(() => {
+    async function loadMeta() {
+      try {
+        const meta = await fetchFilterMetadata();
+        setMetadata(meta);
+      } catch (err) {
+        showNotification(`Failed to load metadata: ${err.message}`, 'error');
+      }
+    }
+    loadMeta();
+  }, [showNotification]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -195,9 +203,11 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, showNotification]);
 
+  // Use useEffect to automatically load appointments based on filters and refreshTrigger
   useEffect(() => {
+    setLoading(true);
     let ignore = false;
     async function fetchData() {
       try {
@@ -221,7 +231,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     return () => {
       ignore = true;
     };
-  }, [filters]);
+  }, [filters, refreshTrigger, showNotification]);
 
   // Handle Quick Status Transition
   const handleStatusTransition = async (appointmentId, nextStatus, options = {}) => {
@@ -320,7 +330,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     setRescheduleModalOpen(true);
     setLoadingRescheduleSlots(true);
     try {
-      const slots = await fetchSlotInventory(initialDoctorId, initialDate);
+      const slots = await fetchSlotInventory({ doctor_id: initialDoctorId, date: initialDate });
       setRescheduleSlots(slots);
     } catch (err) {
       console.error('Failed to load slots for reschedule:', err);
@@ -333,7 +343,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
   const handleRescheduleDoctorOrDateChange = async (newDocId, newDate) => {
     setLoadingRescheduleSlots(true);
     try {
-      const slots = await fetchSlotInventory(newDocId, newDate);
+      const slots = await fetchSlotInventory({ doctor_id: newDocId, date: newDate });
       setRescheduleSlots(slots);
     } catch (err) {
       console.error('Failed to update slots:', err);
@@ -398,7 +408,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     setLoadingSlots(true);
     setSlotsModalOpen(true);
     try {
-      const slots = await fetchSlotInventory(doctorId, filters.date || '');
+      const slots = await fetchSlotInventory({ doctor_id: doctorId, date: filters.date || '' });
       setSlotInventory(slots);
     } catch (err) {
       showNotification(`Failed to load slot inventory: ${err.message}`, 'error');
@@ -411,7 +421,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     setSlotDoctorFilter(doctorId);
     setLoadingSlots(true);
     try {
-      const slots = await fetchSlotInventory(doctorId, filters.date || '');
+      const slots = await fetchSlotInventory({ doctor_id: doctorId, date: filters.date || '' });
       setSlotInventory(slots);
     } catch (err) {
       showNotification(`Failed to load slots: ${err.message}`, 'error');
@@ -422,7 +432,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
 
   // Open Book Appointment Modal & Preload Availability
   const handleOpenBookModal = async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalYYYYMMDD(new Date());
     const defaultDept = metadata.departments?.[0]?.department_id || 'DEP-CARD';
     const docsInDept = metadata.doctors?.filter((d) => d.department_id === defaultDept) || [];
     const defaultDoc = docsInDept[0]?.doctor_id || metadata.doctors?.[0]?.doctor_id || 'DOC-001';
@@ -441,7 +451,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     setBookModalOpen(true);
     setLoadingBookingSlots(true);
     try {
-      const slots = await fetchSlotInventory(defaultDoc, todayStr);
+      const slots = await fetchSlotInventory({ doctor_id: defaultDoc, date: todayStr });
       setBookingSlots(slots);
     } catch (err) {
       console.error('Failed to load slots for booking:', err);
@@ -462,7 +472,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     if (newDocId) {
       setLoadingBookingSlots(true);
       try {
-        const slots = await fetchSlotInventory(newDocId, bookingForm.appointmentDate || new Date().toISOString().split('T')[0]);
+        const slots = await fetchSlotInventory({ doctor_id: newDocId, date: bookingForm.appointmentDate || getLocalYYYYMMDD(new Date()) });
         setBookingSlots(slots);
       } catch (err) {
         console.error('Failed to load slots for department change:', err);
@@ -486,7 +496,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
     if (newDocId && newDate) {
       setLoadingBookingSlots(true);
       try {
-        const slots = await fetchSlotInventory(newDocId, newDate);
+        const slots = await fetchSlotInventory({ doctor_id: newDocId, date: newDate });
         setBookingSlots(slots);
       } catch (err) {
         console.error('Failed to load slots for doctor/date change:', err);
@@ -853,8 +863,8 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
               <div className="filter-quick-dates">
                 <button
                   type="button"
-                  className={`quick-date-chip ${filters.date === new Date().toISOString().split('T')[0] ? 'active' : ''}`}
-                  onClick={() => handleFieldFilter('date', new Date().toISOString().split('T')[0])}
+                  className={`quick-date-chip ${filters.date === getLocalYYYYMMDD(new Date()) ? 'active' : ''}`}
+                  onClick={() => handleFieldFilter('date', getLocalYYYYMMDD(new Date()))}
                 >
                   Today
                 </button>
@@ -1151,6 +1161,8 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
                   label="New Appointment Date *"
                   name="appointmentDate"
                   value={rescheduleForm.appointmentDate}
+                  min={minDateLimit}
+                  max={maxDateLimit}
                   onChange={(e) => {
                     const newDate = e.target.value;
                     setRescheduleForm({ ...rescheduleForm, appointmentDate: newDate });
@@ -1665,7 +1677,13 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001' }) => {
               label="Appointment Date *"
               name="appointmentDate"
               value={bookingForm.appointmentDate}
-              onChange={(e) => handleBookingDoctorOrDateChange(bookingForm.doctorId, e.target.value)}
+              min={minDateLimit}
+              max={maxDateLimit}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                setBookingForm({ ...bookingForm, appointmentDate: newDate, appointmentTime: '' });
+                handleBookingDoctorOrDateChange(bookingForm.doctorId, newDate);
+              }}
             />
           </div>
 

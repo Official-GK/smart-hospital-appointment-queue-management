@@ -95,12 +95,29 @@ class AppointmentRepository:
 
         items: List[SlotInventoryItem] = []
         for doc in doctors_to_query:
+            doctor_info = next((d for d in DOCTORS if d["doctor_id"] == doc), None)
+            gap = 30
+            if doctor_info:
+                dept_info = next((dep for dep in DEPARTMENTS if dep["department_id"] == doctor_info["department_id"]), None)
+                if dept_info and "avg_consultation_time" in dept_info:
+                    gap = int(dept_info["avg_consultation_time"])
+
+            # Generate slots from 09:00 AM to 05:00 PM based on gap
+            start_time = datetime.strptime("09:00 AM", "%I:%M %p")
+            end_time = datetime.strptime("05:00 PM", "%I:%M %p")
+            generated_slots = []
+            curr = start_time
+            while curr < end_time:
+                # Remove leading zero for hours? No, DEFAULT_SLOTS has leading zero (e.g. 09:00 AM)
+                generated_slots.append(curr.strftime("%I:%M %p"))
+                curr += timedelta(minutes=gap)
+
             apts = [
                 a for a in self._appointments.values()
                 if a.doctor_id == doc and a.appointment_date == target_date
             ]
             apt_by_time = {a.appointment_time: a for a in apts}
-            all_times = list(dict.fromkeys(DEFAULT_SLOTS + list(apt_by_time.keys())))
+            all_times = list(dict.fromkeys(generated_slots + list(apt_by_time.keys())))
 
             for t in all_times:
                 if t in apt_by_time:

@@ -11,11 +11,11 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List
 
 DEPARTMENTS: List[Dict[str, str]] = [
-    {"department_id": "DEP-CARD", "department_name": "Cardiology"},
-    {"department_id": "DEP-ORTHO", "department_name": "Orthopedics"},
-    {"department_id": "DEP-GEN", "department_name": "General Medicine"},
-    {"department_id": "DEP-PED", "department_name": "Pediatrics"},
-    {"department_id": "DEP-DERM", "department_name": "Dermatology"},
+    {"department_id": "DEP-CARD", "department_name": "Cardiology", "avg_consultation_time": 30},
+    {"department_id": "DEP-ORTHO", "department_name": "Orthopedics", "avg_consultation_time": 45},
+    {"department_id": "DEP-GEN", "department_name": "General Medicine", "avg_consultation_time": 15},
+    {"department_id": "DEP-PED", "department_name": "Pediatrics", "avg_consultation_time": 20},
+    {"department_id": "DEP-DERM", "department_name": "Dermatology", "avg_consultation_time": 20},
 ]
 
 DOCTORS: List[Dict[str, str]] = [

@@ -7,6 +7,7 @@ const TokenGeneration = ({ onGenerate }) => {
   const [doctorId, setDoctorId] = useState('');
   const [metadata, setMetadata] = useState(null);
   const [error, setError] = useState('');
+  const [generatedToken, setGeneratedToken] = useState(null);
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -30,12 +31,36 @@ const TokenGeneration = ({ onGenerate }) => {
     try {
       // 1. Create a Walk-in Appointment for today
       const now = new Date();
-      // Round to next 30 minutes for simplicity
-      const minutes = now.getMinutes() > 30 ? 60 : 30;
-      now.setMinutes(minutes);
+      const getLocalYYYYMMDD = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+      const dateStr = getLocalYYYYMMDD(now);
+      const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+      // Helper to convert "02:30 PM" to "14:30" for accurate comparison
+      const parseTime = (time12h) => {
+        const [time, modifier] = time12h.split(' ');
+        let [hours, minutes] = time.split(':');
+        if (hours === '12') hours = '00';
+        if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+      };
+
+      // Fetch available slots for the selected doctor
+      const slots = await appointmentService.fetchSlotInventory({ doctor_id: doctorId, date: dateStr });
       
-      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-      const dateStr = now.toISOString().split('T')[0];
+      // Get the absolute earliest free slot in the schedule for this day
+      const availableSlots = slots.filter(s => s.status === 'AVAILABLE');
+      
+      let timeStr = currentTimeStr;
+      if (availableSlots.length > 0) {
+        // Pick the earliest available slot (morning -> afternoon)
+        availableSlots.sort((a, b) => parseTime(a.slot_time).localeCompare(parseTime(b.slot_time)));
+        timeStr = availableSlots[0].slot_time;
+      }
 
       const payload = {
         patient_id: '',
@@ -52,8 +77,9 @@ const TokenGeneration = ({ onGenerate }) => {
       const apt = await appointmentService.createAppointment(payload);
       
       // 2. Transition status to CHECKED_IN to generate Token
-      await appointmentService.transitionStatus(apt.appointment_id, 'Checked-In');
+      const updatedApt = await appointmentService.transitionStatus(apt.appointment_id, 'Checked-In');
 
+      setGeneratedToken(updatedApt.token_number);
       setPatientName('');
       if (onGenerate) onGenerate();
     } catch (err) {
@@ -67,6 +93,11 @@ const TokenGeneration = ({ onGenerate }) => {
     <div className="card" style={{ marginBottom: '1.5rem' }}>
       <h3 className="card-title">Walk-In Token Generation</h3>
       {error && <div style={{ color: 'var(--danger-color)', marginBottom: '1rem' }}>{error}</div>}
+      {generatedToken && (
+        <div style={{ padding: '0.75rem', backgroundColor: '#e6f4ea', color: '#137333', borderRadius: '4px', marginBottom: '1rem', border: '1px solid #ceead6' }}>
+          <strong>Success!</strong> Token <strong>{generatedToken}</strong> has been generated and added to the waiting queue.
+        </div>
+      )}
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div className="input-group" style={{ flex: 1, minWidth: '200px', marginBottom: 0 }}>
           <label className="input-label">Patient Name</label>
@@ -74,7 +105,10 @@ const TokenGeneration = ({ onGenerate }) => {
             type="text" 
             className="input-field" 
             value={patientName} 
-            onChange={(e) => setPatientName(e.target.value)}
+            onChange={(e) => {
+              setPatientName(e.target.value);
+              if (generatedToken) setGeneratedToken(null);
+            }}
             placeholder="Enter patient name"
             required
           />

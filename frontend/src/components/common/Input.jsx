@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const Input = ({ label, type = 'text', placeholder, value, onChange, name, className = '' }) => {
+const Input = ({ label, type = 'text', placeholder, value, onChange, name, className = '', ...rest }) => {
   return (
     <div className={`input-group ${className}`}>
       {label && <label className="input-label" htmlFor={name}>{label}</label>}
@@ -13,6 +13,7 @@ const Input = ({ label, type = 'text', placeholder, value, onChange, name, class
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        {...rest}
       />
     </div>
   );
