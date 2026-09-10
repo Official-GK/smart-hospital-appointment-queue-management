@@ -30,7 +30,7 @@ const QueueDashboard = () => {
 
   const waitingQueue = queue.filter(q => q.status === 'Waiting');
   const calledQueue = queue.filter(q => q.status === 'Called');
-  const inConsultationQueue = queue.filter(q => q.status === 'In Consultation');
+  const inConsultationQueue = queue.filter(q => q.status === 'In-Consultation');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
@@ -38,9 +38,6 @@ const QueueDashboard = () => {
         <h2 style={{ fontSize: '1.25rem', color: 'var(--text-main)', margin: 0 }}>Real-time Queue Management</h2>
         <button className="btn btn-secondary" onClick={fetchQueue}>Refresh</button>
       </div>
-      
-      <TokenGeneration onGenerate={fetchQueue} />
-      
       <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
         <QueueList 
           title="Waiting Queue" 

@@ -64,17 +64,7 @@ const QueueItem = ({ item, onRefresh }) => {
         <strong>Added:</strong> {formatTime(item.queue_entry_time)}
       </p>
       
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-        {item.status === 'Waiting' && (
-          <button className="btn btn-primary" style={{ flex: 1, padding: '0.25rem' }} onClick={handleCall}>Call</button>
-        )}
-        {item.status === 'Called' && (
-          <button className="btn btn-secondary" style={{ flex: 1, padding: '0.25rem' }} onClick={handleStartConsultation}>Start Consultation</button>
-        )}
-        {item.status === 'In Consultation' && (
-          <button className="btn btn-secondary" style={{ flex: 1, padding: '0.25rem' }} onClick={handleComplete}>Complete</button>
-        )}
-      </div>
+      
     </div>
   );
 };

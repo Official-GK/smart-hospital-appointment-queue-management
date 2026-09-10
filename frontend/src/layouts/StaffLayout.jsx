@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const StaffLayout = ({ children }) => {
+const StaffLayout = ({ children, activeTab = 'Dashboard', onTabChange = () => {} }) => {
   return (
     <div className="dashboard-layout">
       <header className="dashboard-header">
@@ -26,10 +26,9 @@ const StaffLayout = ({ children }) => {
         <aside className="dashboard-sidebar">
           <nav>
             <ul>
-              <li className="active">Dashboard</li>
-              <li>Patients</li>
-              <li>Appointments</li>
-              <li>Queue</li>
+              <li className={activeTab === 'Dashboard' ? 'active' : ''} onClick={() => onTabChange('Dashboard')} style={{ cursor: 'pointer' }}>Dashboard</li>
+              <li className={activeTab === 'Patients' ? 'active' : ''} onClick={() => onTabChange('Patients')} style={{ cursor: 'pointer' }}>Patients</li>
+              <li className={activeTab === 'Queue' ? 'active' : ''} onClick={() => onTabChange('Queue')} style={{ cursor: 'pointer' }}>Queue</li>
             </ul>
           </nav>
         </aside>
@@ -44,6 +43,8 @@ const StaffLayout = ({ children }) => {
 
 StaffLayout.propTypes = {
   children: PropTypes.node.isRequired,
+  activeTab: PropTypes.string,
+  onTabChange: PropTypes.func,
 };
 
 export default StaffLayout;
