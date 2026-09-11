@@ -178,6 +178,22 @@ def setup_tokens_schema_and_seed(db_user, db_password):
         return False
 
 
+def setup_patients_schema_and_seed(db_user, db_password):
+    """
+    Connect to hospital_db, create patients and patient_audits tables,
+    and seed demo patients per TECHNICAL_CONTRACTS.md Section 7.
+    """
+    try:
+        from backend.database.patient_db import init_patients_table
+        success = init_patients_table()
+        if success:
+            logger.info("Patients schema and demo patients verified in PostgreSQL.")
+        return success
+    except Exception as e:
+        logger.error(f"Failed to setup patients table in hospital_db: {e}")
+        return False
+
+
 def main():
     logger.info("Starting PostgreSQL Database Setup...")
     conn, user, pwd = get_maintenance_connection()
@@ -187,8 +203,9 @@ def main():
     create_database_if_not_exists(conn, POSTGRES_DB)
     conn.close()
 
-    success = setup_tokens_schema_and_seed(user, pwd)
-    if success:
+    tokens_ok = setup_tokens_schema_and_seed(user, pwd)
+    patients_ok = setup_patients_schema_and_seed(user, pwd)
+    if tokens_ok and patients_ok:
         logger.info(f"SUCCESS: PostgreSQL is fully configured. User: '{user}', DB: '{POSTGRES_DB}'")
         # Update .env if user or password changed
         env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
