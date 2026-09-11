@@ -13,6 +13,8 @@ from backend.services.appointment.schemas.appointment_schemas import (
     SlotInventoryItem,
     StatusAuditRecord,
     StatusTransitionRequest,
+    ScheduleConfig,
+    BlockTimeRequest,
 )
 from backend.services.appointment.services.appointment_service import appointment_service_instance
 
@@ -96,5 +98,23 @@ def reschedule_appointment(appointment_id: str, request: AppointmentRescheduleRe
         data=updated,
         message=f"Appointment rescheduled to {updated.appointment_date} at {updated.appointment_time} with {updated.doctor_name} successfully",
     )
+
+
+@router.get("/schedules/{doctor_id}", response_model=APIResponse[ScheduleConfig])
+def get_doctor_schedule(doctor_id: str):
+    schedule = appointment_service_instance.get_schedule(doctor_id)
+    return APIResponse.ok(data=schedule, message="Doctor schedule retrieved successfully")
+
+
+@router.put("/schedules/{doctor_id}", response_model=APIResponse[ScheduleConfig])
+def update_doctor_schedule(doctor_id: str, config: ScheduleConfig):
+    updated = appointment_service_instance.update_schedule(doctor_id, config)
+    return APIResponse.ok(data=updated, message="Doctor schedule updated successfully")
+
+
+@router.post("/schedules/{doctor_id}/block", response_model=APIResponse[ScheduleConfig])
+def block_doctor_time(doctor_id: str, request: BlockTimeRequest):
+    updated = appointment_service_instance.add_blocked_time(doctor_id, request)
+    return APIResponse.ok(data=updated, message="Time blocked successfully")
 
 

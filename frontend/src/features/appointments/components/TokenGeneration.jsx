@@ -70,6 +70,7 @@ const TokenGeneration = ({ onGenerate }) => {
         appointment_date: dateStr,
         appointment_time: timeStr,
         priority: 'Normal',
+        is_walk_in: true,
         notes: 'Walk-in generated token',
         staff_id: 'Staff Member'
       };

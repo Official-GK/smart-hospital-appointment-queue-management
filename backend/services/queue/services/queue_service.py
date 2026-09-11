@@ -42,6 +42,7 @@ class QueueService:
         department_id: str,
         department_name: str,
         priority: QueuePriority = QueuePriority.NORMAL,
+        is_walk_in: bool = False,
     ) -> QueueToken:
         with self._lock:
             self._token_counter += 1
@@ -58,6 +59,7 @@ class QueueService:
                 department_name=department_name,
                 priority=priority,
                 status=QueueStatus.WAITING,
+                is_walk_in=is_walk_in,
                 queue_entry_time=datetime.utcnow(),
                 estimated_wait_minutes=max(5, (len([t for t in self._tokens.values() if t.status == QueueStatus.WAITING]) + 1) * 10),
             )

@@ -8,6 +8,8 @@ from backend.services.appointment.schemas.appointment_schemas import (
     SlotInventoryItem,
     SlotStatus,
     StatusAuditRecord,
+    ScheduleConfig,
+    BlockedTime,
 )
 
 from backend.database.demo_data import (
@@ -23,7 +25,9 @@ class AppointmentRepository:
     def __init__(self):
         self._appointments: Dict[str, AppointmentResponse] = {}
         self._released_slots: Dict[str, SlotInventoryItem] = {}
+        self._doctor_schedules: Dict[str, ScheduleConfig] = {}
         self._seed_appointments()
+        self._seed_schedules()
 
     def reset(self):
         self._appointments.clear()
@@ -33,6 +37,30 @@ class AppointmentRepository:
     def _seed_appointments(self):
         self._appointments = get_demo_appointments()
         self._released_slots = get_demo_released_slots()
+        
+    def _seed_schedules(self):
+        for doc in DOCTORS:
+            dept_info = next((dep for dep in DEPARTMENTS if dep["department_id"] == doc["department_id"]), None)
+            gap = 30
+            if dept_info and "avg_consultation_time" in dept_info:
+                gap = int(dept_info["avg_consultation_time"])
+            self._doctor_schedules[doc["doctor_id"]] = ScheduleConfig(
+                doctor_id=doc["doctor_id"],
+                slot_duration_minutes=gap
+            )
+
+    def get_schedule(self, doctor_id: str) -> Optional[ScheduleConfig]:
+        return self._doctor_schedules.get(doctor_id)
+
+    def update_schedule(self, doctor_id: str, config: ScheduleConfig) -> ScheduleConfig:
+        self._doctor_schedules[doctor_id] = config
+        return config
+
+    def add_blocked_time(self, doctor_id: str, block: BlockedTime) -> ScheduleConfig:
+        schedule = self._doctor_schedules.get(doctor_id)
+        if schedule:
+            schedule.blocked_times.append(block)
+        return schedule
 
     def get_all(self) -> List[AppointmentResponse]:
         return list(self._appointments.values())
@@ -95,22 +123,39 @@ class AppointmentRepository:
 
         items: List[SlotInventoryItem] = []
         for doc in doctors_to_query:
-            doctor_info = next((d for d in DOCTORS if d["doctor_id"] == doc), None)
-            gap = 30
-            if doctor_info:
-                dept_info = next((dep for dep in DEPARTMENTS if dep["department_id"] == doctor_info["department_id"]), None)
-                if dept_info and "avg_consultation_time" in dept_info:
-                    gap = int(dept_info["avg_consultation_time"])
+            schedule = self.get_schedule(doc)
+            if not schedule:
+                continue
 
-            # Generate slots from 09:00 AM to 05:00 PM based on gap
-            start_time = datetime.strptime("09:00 AM", "%I:%M %p")
-            end_time = datetime.strptime("05:00 PM", "%I:%M %p")
+            # Check if target_date is a working day
+            if target_date.weekday() not in schedule.working_days:
+                continue
+
+            start_time = datetime.strptime(schedule.shift_start, "%I:%M %p")
+            end_time = datetime.strptime(schedule.shift_end, "%I:%M %p")
+            break_start = datetime.strptime(schedule.break_start, "%I:%M %p") if schedule.break_start else None
+            break_end = datetime.strptime(schedule.break_end, "%I:%M %p") if schedule.break_end else None
+
             generated_slots = []
             curr = start_time
             while curr < end_time:
-                # Remove leading zero for hours? No, DEFAULT_SLOTS has leading zero (e.g. 09:00 AM)
-                generated_slots.append(curr.strftime("%I:%M %p"))
-                curr += timedelta(minutes=gap)
+                # Check if inside break
+                if break_start and break_end and break_start <= curr < break_end:
+                    curr += timedelta(minutes=schedule.slot_duration_minutes)
+                    continue
+                
+                # Check if blocked
+                curr_dt = datetime.combine(target_date, curr.time())
+                is_blocked = False
+                for block in schedule.blocked_times:
+                    if block.start_time <= curr_dt < block.end_time:
+                        is_blocked = True
+                        break
+                
+                if not is_blocked:
+                    generated_slots.append(curr.strftime("%I:%M %p"))
+                    
+                curr += timedelta(minutes=schedule.slot_duration_minutes)
 
             apts = [
                 a for a in self._appointments.values()
@@ -148,7 +193,7 @@ class AppointmentRepository:
                     key = f"{doc}:{target_date}:{t}"
                     if key in self._released_slots:
                         items.append(self._released_slots[key])
-                    else:
+                    elif t in generated_slots:
                         items.append(
                             SlotInventoryItem(
                                 doctor_id=doc,

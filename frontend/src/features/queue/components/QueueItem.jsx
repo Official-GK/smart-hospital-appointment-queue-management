@@ -55,7 +55,10 @@ const QueueItem = ({ item, onRefresh }) => {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h4 style={{ margin: 0, fontSize: '1.125rem', color: 'var(--text-main)' }}>{item.token_number}</h4>
-        <span className={`badge ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
+        <div>
+          {item.is_walk_in && <span className="badge badge-primary" style={{ backgroundColor: '#17a2b8', marginRight: '0.5rem' }}>Walk-In</span>}
+          <span className={`badge ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
+        </div>
       </div>
       <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
         <strong>Patient:</strong> {item.patient_name} <br/>

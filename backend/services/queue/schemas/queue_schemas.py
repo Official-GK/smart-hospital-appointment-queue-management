@@ -31,6 +31,7 @@ class QueueToken(BaseModel):
     department_name: str
     priority: QueuePriority = QueuePriority.NORMAL
     status: QueueStatus = QueueStatus.WAITING
+    is_walk_in: bool = False
     queue_entry_time: datetime = Field(default_factory=datetime.utcnow)
     called_time: Optional[datetime] = None
     consultation_start_time: Optional[datetime] = None

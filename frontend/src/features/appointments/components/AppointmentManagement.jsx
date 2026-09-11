@@ -939,6 +939,9 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
                         {apt.priority === 'Senior' && (
                           <Badge text="SENIOR" variant="warning" className="badge-priority-sm" />
                         )}
+                        {apt.is_walk_in && (
+                          <Badge text="Walk-In" variant="primary" className="badge-priority-sm" style={{ backgroundColor: '#17a2b8' }} />
+                        )}
                       </div>
                     </td>
 
