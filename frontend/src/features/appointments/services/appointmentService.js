@@ -1,4 +1,5 @@
 const API_URL = 'http://localhost:8000/api';
+import { getAuthHeaders } from '../../../utils/apiClient';
 
 export const fetchAppointments = async (filters = {}) => {
   // Map frontend camelCase filter keys to backend snake_case keys and ignore "All" or empty values
@@ -12,14 +13,14 @@ export const fetchAppointments = async (filters = {}) => {
   }
   const queryParams = new URLSearchParams(mappedFilters).toString();
   const url = queryParams ? `${API_URL}/appointments?${queryParams}` : `${API_URL}/appointments`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getAuthHeaders() });
   const result = await response.json();
   if (!result.success) throw new Error(result.message);
   return result.data;
 };
 
 export const fetchFilterMetadata = async () => {
-  const response = await fetch(`${API_URL}/appointments/metadata/filters`);
+  const response = await fetch(`${API_URL}/appointments/metadata/filters`, { headers: getAuthHeaders() });
   const result = await response.json();
   if (!result.success) throw new Error(result.message);
   return result.data;
@@ -30,7 +31,7 @@ export const transitionAppointmentStatus = async (appointmentId, new_status) => 
   const body = typeof new_status === 'object' ? new_status : { new_status };
   const response = await fetch(`${API_URL}/appointments/${appointmentId}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
   const result = await response.json();
@@ -41,7 +42,7 @@ export const transitionAppointmentStatus = async (appointmentId, new_status) => 
 export const cancelAppointment = async (appointmentId, request) => {
   const response = await fetch(`${API_URL}/appointments/${appointmentId}/cancel`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(request)
   });
   const result = await response.json();
@@ -53,14 +54,14 @@ export const fetchSlotInventory = async (filters = {}) => {
   const cleanFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v != null && v !== ''));
   const queryParams = new URLSearchParams(cleanFilters).toString();
   const url = queryParams ? `${API_URL}/appointments/inventory/slots?${queryParams}` : `${API_URL}/appointments/inventory/slots`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getAuthHeaders() });
   const result = await response.json();
   if (!result.success) throw new Error(result.message);
   return result.data;
 };
 
 export const fetchAppointmentStatistics = async () => {
-  const response = await fetch(`${API_URL}/appointments/statistics/summary`);
+  const response = await fetch(`${API_URL}/appointments/statistics/summary`, { headers: getAuthHeaders() });
   const result = await response.json();
   if (!result.success) throw new Error(result.message);
   return result.data;
@@ -69,7 +70,7 @@ export const fetchAppointmentStatistics = async () => {
 export const rescheduleAppointment = async (appointmentId, request) => {
   const response = await fetch(`${API_URL}/appointments/${appointmentId}/reschedule`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(request)
   });
   const result = await response.json();
@@ -80,7 +81,7 @@ export const rescheduleAppointment = async (appointmentId, request) => {
 export const createAppointment = async (payload) => {
   const response = await fetch(`${API_URL}/appointments`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload)
   });
   const result = await response.json();

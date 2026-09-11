@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from backend.database.connection import get_cursor
+from backend.database.connection import get_db_connection, get_cursor
+from backend.common.encryption import encrypt_string, decrypt_string
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,10 @@ def fetch_token_by_appointment(appointment_id: str) -> Optional[Dict[str, Any]]:
             cur.execute(query, (appointment_id,))
             row = cur.fetchone()
             if row:
-                return dict(row)
+                token = dict(row)
+                if token.get("patient_name"):
+                    token["patient_name"] = decrypt_string(token["patient_name"])
+                return token
             return None
     except Exception as e:
         logger.warning(f"[Database] Failed to fetch token for appointment '{appointment_id}': {e}")
@@ -135,7 +139,10 @@ def fetch_tokens_by_appointments(appointment_ids: List[str]) -> Dict[str, Dict[s
             rows = cur.fetchall()
             tokens_map = {}
             for row in rows:
-                tokens_map[row["appointment_id"]] = dict(row)
+                token = dict(row)
+                if token.get("patient_name"):
+                    token["patient_name"] = decrypt_string(token["patient_name"])
+                tokens_map[token["appointment_id"]] = token
             return tokens_map
     except Exception as e:
         logger.warning(f"[Database] Failed to batch fetch tokens for appointments: {e}")
@@ -180,7 +187,10 @@ def fetch_token_by_id(token_id: str) -> Optional[Dict[str, Any]]:
             cur.execute(query, (token_id,))
             row = cur.fetchone()
             if row:
-                return dict(row)
+                token = dict(row)
+                if token.get("patient_name"):
+                    token["patient_name"] = decrypt_string(token["patient_name"])
+                return token
             return None
     except Exception as e:
         logger.warning(f"[Database] Failed to fetch token by token_id '{token_id}': {e}")
@@ -222,7 +232,13 @@ def fetch_tokens_by_patient(patient_id: str) -> List[Dict[str, Any]]:
             """
             cur.execute(query, (patient_id,))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            tokens = []
+            for r in rows:
+                token = dict(r)
+                if token.get("patient_name"):
+                    token["patient_name"] = decrypt_string(token["patient_name"])
+                tokens.append(token)
+            return tokens
     except Exception as e:
         logger.warning(f"[Database] Failed to fetch tokens for patient '{patient_id}': {e}")
         return []
@@ -276,7 +292,13 @@ def fetch_live_queue_tokens(
             """
             cur.execute(query, tuple(params))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            tokens = []
+            for r in rows:
+                token = dict(r)
+                if token.get("patient_name"):
+                    token["patient_name"] = decrypt_string(token["patient_name"])
+                tokens.append(token)
+            return tokens
     except Exception as e:
         logger.warning(f"[Database] Failed to fetch live queue from PostgreSQL: {e}")
         return []
@@ -295,6 +317,12 @@ def save_token(token_data: Dict[str, Any]) -> bool:
         with get_cursor(commit=True) as cur:
             if cur is None:
                 return False
+                
+            # Copy dict so we don't mutate the in-memory object
+            encrypted_data = dict(token_data)
+            if "patient_name" in encrypted_data and encrypted_data["patient_name"]:
+                encrypted_data["patient_name"] = encrypt_string(encrypted_data["patient_name"])
+                
             query = """
                 INSERT INTO tokens (
                     token_id,
@@ -343,23 +371,23 @@ def save_token(token_data: Dict[str, Any]) -> bool:
             """
             # Ensure timestamps default to utcnow if None
             payload = {
-                "token_id": token_data.get("token_id"),
-                "token_number": token_data.get("token_number"),
-                "appointment_id": token_data.get("appointment_id"),
-                "patient_id": token_data.get("patient_id"),
-                "patient_name": token_data.get("patient_name", ""),
-                "doctor_id": token_data.get("doctor_id"),
-                "doctor_name": token_data.get("doctor_name", ""),
-                "department_id": token_data.get("department_id"),
-                "department_name": token_data.get("department_name", ""),
-                "priority": token_data.get("priority", "Normal"),
-                "status": token_data.get("status", "Waiting"),
-                "created_at": token_data.get("created_at") or datetime.utcnow(),
-                "queue_entry_time": token_data.get("queue_entry_time") or datetime.utcnow(),
-                "called_time": token_data.get("called_time"),
-                "consultation_start_time": token_data.get("consultation_start_time"),
-                "consultation_end_time": token_data.get("consultation_end_time"),
-                "estimated_wait_minutes": token_data.get("estimated_wait_minutes", 15),
+                "token_id": encrypted_data.get("token_id"),
+                "token_number": encrypted_data.get("token_number"),
+                "appointment_id": encrypted_data.get("appointment_id"),
+                "patient_id": encrypted_data.get("patient_id"),
+                "patient_name": encrypted_data.get("patient_name", ""),
+                "doctor_id": encrypted_data.get("doctor_id"),
+                "doctor_name": encrypted_data.get("doctor_name", ""),
+                "department_id": encrypted_data.get("department_id"),
+                "department_name": encrypted_data.get("department_name", ""),
+                "priority": encrypted_data.get("priority", "Normal"),
+                "status": encrypted_data.get("status", "Waiting"),
+                "created_at": encrypted_data.get("created_at") or datetime.utcnow(),
+                "queue_entry_time": encrypted_data.get("queue_entry_time") or datetime.utcnow(),
+                "called_time": encrypted_data.get("called_time"),
+                "consultation_start_time": encrypted_data.get("consultation_start_time"),
+                "consultation_end_time": encrypted_data.get("consultation_end_time"),
+                "estimated_wait_minutes": encrypted_data.get("estimated_wait_minutes", 15),
             }
             cur.execute(query, payload)
             return True
