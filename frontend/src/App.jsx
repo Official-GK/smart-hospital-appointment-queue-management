@@ -1,10 +1,10 @@
 import React from 'react';
-import Temp from './Temp';
+import StaffDashboard from './pages/StaffDashboard';
 import './App.css';
 
 function App() {
   return (
-    <Temp />
+    <StaffDashboard />
   );
 }
 
