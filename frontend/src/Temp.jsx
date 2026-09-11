@@ -5,9 +5,13 @@ import './App.css';
 
 const Temp = () => {
   const [view, setView] = useState('registration'); // 'registration' | 'profile' | 'dashboard'
+  const [selectedPatientId, setSelectedPatientId] = useState('PAT-001');
 
   const handleRegistrationSuccess = (patient) => {
     console.log('Patient registered successfully:', patient);
+    if (patient?.patient_id) {
+      setSelectedPatientId(patient.patient_id);
+    }
   };
 
   return (
@@ -86,14 +90,17 @@ const Temp = () => {
           <PatientRegistration
             onRegistrationSuccess={handleRegistrationSuccess}
             onCheckInPatient={() => setView('dashboard')}
-            onViewProfile={() => setView('profile')}
+            onViewProfile={(patientId) => {
+              if (patientId) setSelectedPatientId(patientId);
+              setView('profile');
+            }}
           />
         </main>
       )}
 
       {view === 'profile' && (
         <main style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 1.5rem' }}>
-          <PatientProfile />
+          <PatientProfile initialPatientId={selectedPatientId} key={selectedPatientId} />
         </main>
       )}
 

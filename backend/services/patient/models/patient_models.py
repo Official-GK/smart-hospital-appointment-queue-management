@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from backend.services.patient.schemas.patient_schemas import (
     PatientCreate,
     PatientResponse,
@@ -8,11 +8,71 @@ from backend.services.patient.schemas.patient_schemas import (
     PatientAuditRecord,
     PatientUpdateRequest,
 )
+from backend.database.patient_db import (
+    fetch_all_patients,
+    fetch_patient_audits_db,
+    fetch_patient_by_id,
+    fetch_patient_by_phone,
+    generate_next_patient_id,
+    init_patients_table,
+    register_patient_record,
+    reset_patients_db,
+    save_patient_audit_db,
+    search_patients_db,
+    update_patient_status_db,
+)
+
+
+def _row_to_patient_response(row: Dict[str, Any]) -> PatientResponse:
+    dob = row.get("date_of_birth")
+    if isinstance(dob, str):
+        try:
+            dob = date.fromisoformat(dob)
+        except Exception:
+            dob = None
+
+    created = row.get("created_at")
+    if isinstance(created, str):
+        try:
+            created = datetime.fromisoformat(created)
+        except Exception:
+            created = datetime.utcnow()
+    elif not created:
+        created = datetime.utcnow()
+
+    last_arr = row.get("last_arrival_time")
+    if isinstance(last_arr, str):
+        try:
+            last_arr = datetime.fromisoformat(last_arr)
+        except Exception:
+            last_arr = None
+
+    status_val = row.get("status") or "Registered"
+    try:
+        p_status = PatientStatus(status_val)
+    except Exception:
+        p_status = PatientStatus.REGISTERED
+
+    return PatientResponse(
+        patient_id=row["patient_id"],
+        first_name=row["first_name"],
+        last_name=row["last_name"],
+        patient_name=row.get("patient_name") or f"{row['first_name']} {row['last_name']}".strip(),
+        date_of_birth=dob,
+        age=row.get("age"),
+        gender=row.get("gender") or "Other",
+        phone=row["phone"],
+        address=row.get("address"),
+        status=p_status,
+        created_at=created,
+        last_arrival_time=last_arr,
+    )
 
 
 class PatientRepository:
     """
-    In-memory repository for patient demographics and status tracking.
+    Repository for patient demographics and status tracking adhering to TECHNICAL_CONTRACTS.md Section 7.
+    Backs persistence with PostgreSQL via backend.database with in-memory mirror.
     """
 
     def __init__(self):
@@ -21,6 +81,12 @@ class PatientRepository:
         self._seed_patients()
 
     def _seed_patients(self):
+        init_patients_table()
+        db_rows = fetch_all_patients()
+        for r in db_rows:
+            p = _row_to_patient_response(r)
+            self._patients[p.patient_id] = p
+
         initial_patients = [
             PatientResponse(
                 patient_id="PAT-001",
@@ -127,13 +193,21 @@ class PatientRepository:
     def reset(self):
         self._patients.clear()
         self._audit_records.clear()
+        reset_patients_db()
         self._seed_patients()
 
     def get_all(self) -> List[PatientResponse]:
         return list(self._patients.values())
 
     def get_by_id(self, patient_id: str) -> Optional[PatientResponse]:
-        return self._patients.get(patient_id)
+        if patient_id in self._patients:
+            return self._patients[patient_id]
+        db_patient = fetch_patient_by_id(patient_id)
+        if db_patient:
+            p = _row_to_patient_response(db_patient)
+            self._patients[p.patient_id] = p
+            return p
+        return None
 
     @staticmethod
     def normalize_phone(phone: str) -> str:
@@ -149,6 +223,11 @@ class PatientRepository:
                 return p
             if target_digits and len(target_digits) >= 7 and self.normalize_phone(p.phone) == target_digits:
                 return p
+        db_patient = fetch_patient_by_phone(phone)
+        if db_patient:
+            p = _row_to_patient_response(db_patient)
+            self._patients[p.patient_id] = p
+            return p
         return None
 
     def check_duplicate(
@@ -185,44 +264,22 @@ class PatientRepository:
         ]
 
     def create(self, payload: PatientCreate) -> PatientResponse:
-        # Auto-generate unique Patient ID with collision avoidance
-        max_seq = 0
-        for pid in self._patients.keys():
-            if pid.startswith("PAT-"):
-                suffix = pid[4:]
-                if suffix.isdigit():
-                    max_seq = max(max_seq, int(suffix))
-        next_seq = max_seq + 1
-        patient_id = f"PAT-{next_seq:03d}"
-
-        first_name = (payload.first_name or "").strip()
-        last_name = (payload.last_name or "").strip()
-        full_name = f"{first_name} {last_name}".strip() if last_name else first_name
-
-        # Calculate age if date_of_birth is present and age is not
-        age = payload.age
-        dob = payload.date_of_birth
-        today = date.today()
-        if age is None and dob:
-            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        elif age is not None and dob is None:
-            dob = date(today.year - age, 1, 1)
-
-        new_patient = PatientResponse(
-            patient_id=patient_id,
-            first_name=first_name,
-            last_name=last_name,
-            patient_name=full_name,
-            date_of_birth=dob,
-            age=age,
-            gender=payload.gender or "Other",
-            phone=payload.phone.strip() if payload.phone else "",
-            address=payload.address,
-            status=PatientStatus.REGISTERED,
-            created_at=datetime.utcnow(),
-        )
-        self._patients[patient_id] = new_patient
+        data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+        record_dict, _ = register_patient_record(data, reuse_existing=False)
+        new_patient = _row_to_patient_response(record_dict)
+        self._patients[new_patient.patient_id] = new_patient
         return new_patient
+
+    def get_or_create(self, payload: PatientCreate) -> Tuple[PatientResponse, bool]:
+        """
+        When a new patient is being registered, a new patient id is generated.
+        Same patient does not require new ID; reuses existing record.
+        """
+        data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+        record_dict, is_new = register_patient_record(data, reuse_existing=True)
+        patient = _row_to_patient_response(record_dict)
+        self._patients[patient.patient_id] = patient
+        return patient, is_new
 
     def update_status(
         self,
@@ -232,10 +289,13 @@ class PatientRepository:
     ) -> Optional[PatientResponse]:
         patient = self._patients.get(patient_id)
         if not patient:
+            patient = self.get_by_id(patient_id)
+        if not patient:
             return None
         patient.status = status
         if arrival_time:
             patient.last_arrival_time = arrival_time
+        update_patient_status_db(patient_id, status.value, arrival_time)
         return patient
 
     def update_patient(
@@ -243,7 +303,7 @@ class PatientRepository:
         patient_id: str,
         payload: PatientUpdateRequest,
     ) -> Tuple[Optional[PatientResponse], List[PatientAuditRecord]]:
-        patient = self._patients.get(patient_id)
+        patient = self.get_by_id(patient_id)
         if not patient:
             return None, []
 
@@ -347,9 +407,28 @@ class PatientRepository:
             if patient_id not in self._audit_records:
                 self._audit_records[patient_id] = []
             self._audit_records[patient_id].extend(audits)
+            for a in audits:
+                audit_data = a.model_dump() if hasattr(a, "model_dump") else a.dict()
+                save_patient_audit_db(audit_data)
 
         return patient, audits
 
     def get_audit_trail(self, patient_id: str) -> List[PatientAuditRecord]:
+        db_audits = fetch_patient_audits_db(patient_id)
+        if db_audits:
+            return [
+                PatientAuditRecord(
+                    audit_id=a["audit_id"],
+                    patient_id=a["patient_id"],
+                    timestamp=a["timestamp"] if isinstance(a["timestamp"], datetime) else datetime.fromisoformat(str(a["timestamp"])),
+                    changed_by=a["changed_by"],
+                    field_name=a["field_name"],
+                    old_value=a.get("old_value"),
+                    new_value=a.get("new_value"),
+                    notes=a.get("notes"),
+                )
+                for a in db_audits
+            ]
         return list(self._audit_records.get(patient_id, []))
+
 

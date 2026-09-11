@@ -20,6 +20,7 @@ const PatientRegistration = ({
 
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [duplicateData, setDuplicateData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [registeredPatient, setRegisteredPatient] = useState(null);
@@ -63,6 +64,7 @@ const PatientRegistration = ({
     const cleanId = (idVal || '').trim();
     if (cleanPhone.length < 7 && !cleanId) {
       setDuplicateWarning(null);
+      setDuplicateData(null);
       return;
     }
 
@@ -75,8 +77,10 @@ const PatientRegistration = ({
 
       if (result && result.is_duplicate) {
         setDuplicateWarning(result.message || 'Duplicate patient record detected.');
+        setDuplicateData(result);
       } else {
         setDuplicateWarning(null);
+        setDuplicateData(null);
       }
     } catch (err) {
       console.warn('Duplicate check could not complete:', err);
@@ -141,7 +145,17 @@ const PatientRegistration = ({
       onRegistrationSuccess(newPatient);
     } catch (err) {
       console.error('Registration failed:', err);
-      setError(err.message || 'Registration failed. Please check details and try again.');
+      const errMsg = err.message || 'Registration failed. Please check details and try again.';
+      setError(errMsg);
+      const match = errMsg.match(/PAT-\d{3,}/);
+      if (match) {
+        setDuplicateData((prev) => ({
+          ...prev,
+          is_duplicate: true,
+          existing_patient_id: match[0],
+          message: errMsg,
+        }));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -158,6 +172,7 @@ const PatientRegistration = ({
     setIdentifier('');
     setNotes('');
     setDuplicateWarning(null);
+    setDuplicateData(null);
     setError(null);
     setRegisteredPatient(null);
   };
@@ -266,13 +281,25 @@ const PatientRegistration = ({
         /* Registration Form */
         <div className="registration-card">
           {error && (
-            <div className="registration-error-alert">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>{error}</span>
+            <div className="registration-error-alert" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.625rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
+              </div>
+              {duplicateData?.existing_patient_id && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8125rem', padding: '0.35rem 0.75rem', alignSelf: 'flex-start' }}
+                  onClick={() => onViewProfile(duplicateData.existing_patient_id)}
+                >
+                  View Existing Patient Profile ({duplicateData.existing_patient_id})
+                </button>
+              )}
             </div>
           )}
 
@@ -283,12 +310,24 @@ const PatientRegistration = ({
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <div>
-                <strong>Duplicate Conflict Detected</strong>
+              <div style={{ flex: 1 }}>
+                <strong>Existing Patient Found</strong>
                 <p>{duplicateWarning}</p>
                 <span className="duplicate-hint">
-                  Please verify if the patient is already in the system, or check in using their existing record.
+                  Same patient does not require a new ID. You can access and manage their profile directly.
                 </span>
+                {duplicateData?.existing_patient_id && (
+                  <div style={{ marginTop: '0.625rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.8125rem', padding: '0.35rem 0.75rem' }}
+                      onClick={() => onViewProfile(duplicateData.existing_patient_id)}
+                    >
+                      View Existing Patient Profile ({duplicateData.existing_patient_id})
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
