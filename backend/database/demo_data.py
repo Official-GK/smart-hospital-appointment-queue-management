@@ -24,6 +24,12 @@ DOCTORS: List[Dict[str, str]] = [
     {"doctor_id": "DOC-003", "doctor_name": "Dr. Emily Davis", "department_id": "DEP-GEN", "department_name": "General Medicine"},
     {"doctor_id": "DOC-004", "doctor_name": "Dr. Michael Brown", "department_id": "DEP-PED", "department_name": "Pediatrics"},
     {"doctor_id": "DOC-005", "doctor_name": "Dr. Priya Patel", "department_id": "DEP-DERM", "department_name": "Dermatology"},
+    # Weekend Coverage Doctors
+    {"doctor_id": "DOC-006", "doctor_name": "Dr. William Vance", "department_id": "DEP-CARD", "department_name": "Cardiology"},
+    {"doctor_id": "DOC-007", "doctor_name": "Dr. Olivia Martinez", "department_id": "DEP-ORTHO", "department_name": "Orthopedics"},
+    {"doctor_id": "DOC-008", "doctor_name": "Dr. Daniel Lee", "department_id": "DEP-GEN", "department_name": "General Medicine"},
+    {"doctor_id": "DOC-009", "doctor_name": "Dr. Sophia Carter", "department_id": "DEP-PED", "department_name": "Pediatrics"},
+    {"doctor_id": "DOC-010", "doctor_name": "Dr. Lucas Bennett", "department_id": "DEP-DERM", "department_name": "Dermatology"},
 ]
 
 DEFAULT_SLOTS: List[str] = [

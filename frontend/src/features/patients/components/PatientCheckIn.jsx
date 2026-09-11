@@ -20,22 +20,12 @@ const DOCTORS_DATA = [
 ];
 
 const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
-  const [activeTab, setActiveTab] = useState('scheduled'); // 'scheduled' | 'walkin'
   const [eligibleList, setEligibleList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState(null);
   const [receipt, setReceipt] = useState(null);
-
-  // Walk-in form state
-  const [walkinName, setWalkinName] = useState('');
-  const [walkinPhone, setWalkinPhone] = useState('');
-  const [walkinDept, setWalkinDept] = useState('DEP-GEN');
-  const [walkinDoctor, setWalkinDoctor] = useState('DOC-003');
-  const [walkinPriority, setWalkinPriority] = useState('Normal');
-  const [walkinNotes, setWalkinNotes] = useState('');
-  const [walkinSubmitting, setWalkinSubmitting] = useState(false);
 
   const fetchEligible = async () => {
     try {
@@ -55,13 +45,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
     fetchEligible();
   }, []);
 
-  // Update doctor choices when department changes
-  useEffect(() => {
-    const matched = DOCTORS_DATA.filter(d => d.departmentId === walkinDept);
-    if (matched.length > 0) {
-      setWalkinDoctor(matched[0].id);
-    }
-  }, [walkinDept]);
+
 
   const handleExecuteCheckIn = async (item) => {
     try {
@@ -90,48 +74,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
     }
   };
 
-  const handleWalkInSubmit = async (e) => {
-    e.preventDefault();
-    if (!walkinName.trim()) {
-      setError('Please enter the patient name for walk-in check-in.');
-      return;
-    }
 
-    try {
-      setWalkinSubmitting(true);
-      setError(null);
-
-      const docObj = DOCTORS_DATA.find(d => d.id === walkinDoctor);
-      const deptObj = DEPARTMENTS_DATA.find(d => d.id === walkinDept);
-
-      const checkInReceipt = await patientService.checkInPatient({
-        patient_name: walkinName.trim(),
-        phone: walkinPhone.trim() || undefined,
-        department_id: walkinDept,
-        department_name: deptObj ? deptObj.name : undefined,
-        doctor_id: walkinDoctor,
-        doctor_name: docObj ? docObj.name : undefined,
-        priority: walkinPriority,
-        is_walk_in: true,
-        notes: walkinNotes.trim() || 'Walk-in arrival',
-      });
-
-      setReceipt(checkInReceipt);
-      onCheckInSuccess(checkInReceipt);
-
-      // Reset walk-in form
-      setWalkinName('');
-      setWalkinPhone('');
-      setWalkinNotes('');
-      setWalkinPriority('Normal');
-      await fetchEligible();
-    } catch (err) {
-      console.error('Walk-in check-in error', err);
-      setError(err.message || 'Failed to check in walk-in patient');
-    } finally {
-      setWalkinSubmitting(false);
-    }
-  };
 
   const filteredEligible = eligibleList.filter(item => {
     const q = searchQuery.toLowerCase().trim();
@@ -186,25 +129,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="checkin-tabs">
-        <button
-          className={`checkin-tab-btn ${activeTab === 'scheduled' ? 'active' : ''}`}
-          onClick={() => setActiveTab('scheduled')}
-        >
-          Scheduled Appointments ({eligibleList.length})
-        </button>
-        <button
-          className={`checkin-tab-btn ${activeTab === 'walkin' ? 'active' : ''}`}
-          onClick={() => setActiveTab('walkin')}
-        >
-          Walk-In Patient Check-In
-        </button>
-      </div>
-
-      {/* Tab 1: Scheduled Appointments */}
-      {activeTab === 'scheduled' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
           <div className="checkin-search-bar">
             <input
               type="text"
@@ -283,106 +208,6 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
             </table>
           </div>
         </div>
-      )}
-
-      {/* Tab 2: Walk-In Check-In Form */}
-      {activeTab === 'walkin' && (
-        <div className="walkin-card">
-          <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.125rem', color: 'var(--text-main)' }}>
-            Instant Walk-In Arrival Registration
-          </h3>
-          <p style={{ margin: '0 0 1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            Directly register and queue a walk-in patient without an existing prior booking.
-          </p>
-
-          <form onSubmit={handleWalkInSubmit}>
-            <div className="walkin-form-grid">
-              <div className="form-group">
-                <label className="form-label">Patient Full Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. John Doe"
-                  value={walkinName}
-                  onChange={(e) => setWalkinName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Contact Phone</label>
-                <input
-                  type="tel"
-                  className="form-control"
-                  placeholder="e.g. +1-555-0199"
-                  value={walkinPhone}
-                  onChange={(e) => setWalkinPhone(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Department *</label>
-                <select
-                  className="form-control"
-                  value={walkinDept}
-                  onChange={(e) => setWalkinDept(e.target.value)}
-                >
-                  {DEPARTMENTS_DATA.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Attending Doctor *</label>
-                <select
-                  className="form-control"
-                  value={walkinDoctor}
-                  onChange={(e) => setWalkinDoctor(e.target.value)}
-                >
-                  {DOCTORS_DATA.filter(d => d.departmentId === walkinDept).map(doc => (
-                    <option key={doc.id} value={doc.id}>{doc.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Queue Priority</label>
-                <select
-                  className="form-control"
-                  value={walkinPriority}
-                  onChange={(e) => setWalkinPriority(e.target.value)}
-                >
-                  <option value="Normal">Normal Priority</option>
-                  <option value="Emergency">Emergency (Immediate Triage)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Reason / Notes</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Fever, persistent cough"
-                  value={walkinNotes}
-                  onChange={(e) => setWalkinNotes(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button
-                type="submit"
-                className="btn-checkin-action"
-                style={{ padding: '0.625rem 1.5rem', fontSize: '0.875rem' }}
-                disabled={walkinSubmitting}
-              >
-                {walkinSubmitting ? 'Checking In...' : 'Check In Walk-In Patient'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Confirmation Receipt Modal */}
       {receipt && (

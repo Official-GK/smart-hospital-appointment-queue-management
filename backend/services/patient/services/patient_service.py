@@ -139,29 +139,12 @@ class PatientService:
         # -------------------------------------------------------------
         # 1. Resolve / Ensure Patient Demographic Record
         # -------------------------------------------------------------
-        patient: Optional[PatientResponse] = None
-        if request.patient_id:
-            patient = self.repo.get_by_id(request.patient_id)
-
-        if not patient and request.phone:
-            patient = self.repo.get_by_phone(request.phone)
-
+        if not request.patient_id:
+            raise HTTPException(status_code=400, detail="Patient ID is required for check-in.")
+            
+        patient = self.repo.get_by_id(request.patient_id)
         if not patient:
-            # Auto-register walk-in / new patient
-            full_name = (request.patient_name or "Walk-in Patient").strip()
-            parts = full_name.split(" ", 1)
-            first_name = parts[0]
-            last_name = parts[1] if len(parts) > 1 else "Patient"
-            phone = request.phone.strip() if request.phone else f"+1-555-{uuid.uuid4().hex[:4]}"
-            patient = self.repo.create(
-                PatientCreate(
-                    first_name=first_name,
-                    last_name=last_name,
-                    phone=phone,
-                    gender="Other",
-                    address="Walk-in Registration",
-                )
-            )
+            raise HTTPException(status_code=404, detail=f"Patient ID '{request.patient_id}' not found. Must be registered first.")
 
         # -------------------------------------------------------------
         # 2. Case A: Check-In for an Existing Appointment

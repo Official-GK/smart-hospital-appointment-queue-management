@@ -5,6 +5,7 @@ import Button from '../components/common/Button';
 import AppointmentManagement from '../features/appointments/components/AppointmentManagement';
 import QueueDashboard from '../features/queue/components/QueueDashboard';
 import TokenGeneration from '../features/appointments/components/TokenGeneration';
+import PatientManagement from '../features/patients/components/PatientManagement';
 
 const StaffDashboard = () => {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -18,19 +19,9 @@ const StaffDashboard = () => {
       {activeTab === 'Dashboard' && (
         <>
           <h1 className="page-title">Staff Dashboard</h1>
-          <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
-            <section className="dashboard-section">
+          <div style={{ marginBottom: '2rem', width: '100%' }}>
+            <section className="dashboard-section" style={{ width: '100%' }}>
               <TokenGeneration onGenerate={handleGenerate} />
-            </section>
-            
-            {/* Patient Section Placeholder */}
-            <section className="dashboard-section">
-              <Card title="Patient Management">
-                <p className="placeholder-text">Patient feature components will be integrated here.</p>
-                <div className="placeholder-actions">
-                  <Button variant="primary">Register Patient</Button>
-                </div>
-              </Card>
             </section>
           </div>
           <section style={{ marginBottom: '3rem', width: '100%' }}>
@@ -46,10 +37,9 @@ const StaffDashboard = () => {
       )}
 
       {activeTab === 'Patients' && (
-        <div>
-          <h1 className="page-title">Patient Management</h1>
-          <p>Patient management features coming soon.</p>
-        </div>
+        <section style={{ width: '100%' }}>
+          <PatientManagement />
+        </section>
       )}
 
     </StaffLayout>
