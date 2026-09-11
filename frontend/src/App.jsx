@@ -1,13 +1,11 @@
-import React from 'react'
-import './App.css'
+import React from 'react';
+import StaffDashboard from './pages/StaffDashboard';
+import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <h1>Smart Hospital Appointment & Queue Management System</h1>
-      <p>Development environment is ready.</p>
-    </div>
-  )
+    <StaffDashboard />
+  );
 }
 
-export default App
+export default App;
