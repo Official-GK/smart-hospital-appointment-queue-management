@@ -17,7 +17,7 @@ def _normalize_datetime(dt: Optional[datetime]) -> Optional[datetime]:
 
 class QueueService:
     _instance = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __new__(cls):
         with cls._lock:
@@ -61,9 +61,17 @@ class QueueService:
                 status=QueueStatus.WAITING,
                 is_walk_in=is_walk_in,
                 queue_entry_time=datetime.utcnow(),
-                estimated_wait_minutes=max(5, (len([t for t in self._tokens.values() if t.status == QueueStatus.WAITING]) + 1) * 10),
+                estimated_wait_minutes=10,
             )
             self._tokens[appointment_id] = token
+
+            # Calculate dynamic wait time using WaitingTimeService (HAQM-75)
+            try:
+                from backend.services.queue.services.waiting_time_service import waiting_time_service_instance
+                wait_info = waiting_time_service_instance.calculate_token_wait_time(token.token_id)
+                token.estimated_wait_minutes = wait_info.estimated_wait_minutes
+            except Exception:
+                pass
 
             # Persist to PostgreSQL database (handled gracefully with try...except)
             try:
@@ -79,8 +87,7 @@ class QueueService:
                     "department_name": token.department_name,
                     "priority": token.priority.value if hasattr(token.priority, "value") else str(token.priority),
                     "status": token.status.value if hasattr(token.status, "value") else str(token.status),
-                    "created_at": token.queue_entry_time,
-                    "queue_entry_time": token.queue_entry_time,
+                    "queue_entry_time": token.queue_entry_time.isoformat(),
                     "estimated_wait_minutes": token.estimated_wait_minutes,
                 })
             except Exception:
@@ -105,6 +112,16 @@ class QueueService:
             if consultation_end_time:
                 token.consultation_end_time = consultation_end_time
 
+            # Recalculate remaining wait times dynamically (HAQM-75)
+            try:
+                from backend.services.queue.services.waiting_time_service import waiting_time_service_instance
+                waiting_time_service_instance.recalculate_queue_wait_times(
+                    doctor_id=token.doctor_id,
+                    department_id=token.department_id,
+                )
+            except Exception:
+                pass
+
             # Persist status update to PostgreSQL
             try:
                 save_token({
@@ -120,6 +137,13 @@ class QueueService:
                 pass
 
             return token
+
+    def get_token(self, token_identifier: str) -> Optional[QueueToken]:
+        with self._lock:
+            for t in self._tokens.values():
+                if t.token_id == token_identifier or t.appointment_id == token_identifier:
+                    return t
+        return self.get_token_by_appointment(token_identifier)
 
     def get_token_by_appointment(self, appointment_id: str) -> Optional[QueueToken]:
         # Attempt PostgreSQL fetch first with graceful fallback
