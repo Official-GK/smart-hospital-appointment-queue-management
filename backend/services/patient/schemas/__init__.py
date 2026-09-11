@@ -7,6 +7,11 @@ from backend.services.patient.schemas.patient_schemas import (
     PatientCheckInRequest,
     PatientCheckInResponse,
     EligibleCheckInItem,
+    PatientAuditRecord,
+    PatientUpdateRequest,
+    TokenHistoryItem,
+    VisitHistoryItem,
+    PatientProfileResponse,
 )
 
 __all__ = [
@@ -18,4 +23,9 @@ __all__ = [
     "PatientCheckInRequest",
     "PatientCheckInResponse",
     "EligibleCheckInItem",
+    "PatientAuditRecord",
+    "PatientUpdateRequest",
+    "TokenHistoryItem",
+    "VisitHistoryItem",
+    "PatientProfileResponse",
 ]

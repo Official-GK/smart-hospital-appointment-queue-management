@@ -1,10 +1,12 @@
 import uuid
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from backend.services.patient.schemas.patient_schemas import (
     PatientCreate,
     PatientResponse,
     PatientStatus,
+    PatientAuditRecord,
+    PatientUpdateRequest,
 )
 
 
@@ -15,6 +17,7 @@ class PatientRepository:
 
     def __init__(self):
         self._patients: Dict[str, PatientResponse] = {}
+        self._audit_records: Dict[str, List[PatientAuditRecord]] = {}
         self._seed_patients()
 
     def _seed_patients(self):
@@ -123,6 +126,7 @@ class PatientRepository:
 
     def reset(self):
         self._patients.clear()
+        self._audit_records.clear()
         self._seed_patients()
 
     def get_all(self) -> List[PatientResponse]:
@@ -181,3 +185,119 @@ class PatientRepository:
         if arrival_time:
             patient.last_arrival_time = arrival_time
         return patient
+
+    def update_patient(
+        self,
+        patient_id: str,
+        payload: PatientUpdateRequest,
+    ) -> Tuple[Optional[PatientResponse], List[PatientAuditRecord]]:
+        patient = self._patients.get(patient_id)
+        if not patient:
+            return None, []
+
+        now = datetime.utcnow()
+        audits: List[PatientAuditRecord] = []
+        changed_by = payload.updated_by or "Authorized Staff"
+
+        if payload.first_name is not None and payload.first_name.strip() != patient.first_name:
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="first_name",
+                    old_value=patient.first_name,
+                    new_value=payload.first_name.strip(),
+                    notes=payload.notes,
+                )
+            )
+            patient.first_name = payload.first_name.strip()
+            patient.patient_name = f"{patient.first_name} {patient.last_name}"
+
+        if payload.last_name is not None and payload.last_name.strip() != patient.last_name:
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="last_name",
+                    old_value=patient.last_name,
+                    new_value=payload.last_name.strip(),
+                    notes=payload.notes,
+                )
+            )
+            patient.last_name = payload.last_name.strip()
+            patient.patient_name = f"{patient.first_name} {patient.last_name}"
+
+        if payload.phone is not None and payload.phone.strip() != patient.phone:
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="phone",
+                    old_value=patient.phone,
+                    new_value=payload.phone.strip(),
+                    notes=payload.notes,
+                )
+            )
+            patient.phone = payload.phone.strip()
+
+        if payload.address is not None and payload.address.strip() != (patient.address or ""):
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="address",
+                    old_value=patient.address,
+                    new_value=payload.address.strip(),
+                    notes=payload.notes,
+                )
+            )
+            patient.address = payload.address.strip()
+
+        if payload.gender is not None and payload.gender != patient.gender:
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="gender",
+                    old_value=patient.gender,
+                    new_value=payload.gender,
+                    notes=payload.notes,
+                )
+            )
+            patient.gender = payload.gender
+
+        if payload.date_of_birth is not None and payload.date_of_birth != patient.date_of_birth:
+            audits.append(
+                PatientAuditRecord(
+                    audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+                    patient_id=patient_id,
+                    timestamp=now,
+                    changed_by=changed_by,
+                    field_name="date_of_birth",
+                    old_value=patient.date_of_birth.isoformat() if patient.date_of_birth else None,
+                    new_value=payload.date_of_birth.isoformat(),
+                    notes=payload.notes,
+                )
+            )
+            patient.date_of_birth = payload.date_of_birth
+
+        if audits:
+            if patient_id not in self._audit_records:
+                self._audit_records[patient_id] = []
+            self._audit_records[patient_id].extend(audits)
+
+        return patient, audits
+
+    def get_audit_trail(self, patient_id: str) -> List[PatientAuditRecord]:
+        return list(self._audit_records.get(patient_id, []))
+

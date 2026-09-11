@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import HTTPException
 
 from backend.services.patient.models.patient_models import PatientRepository
@@ -11,6 +11,11 @@ from backend.services.patient.schemas.patient_schemas import (
     PatientCreate,
     PatientResponse,
     PatientStatus,
+    PatientAuditRecord,
+    PatientUpdateRequest,
+    TokenHistoryItem,
+    VisitHistoryItem,
+    PatientProfileResponse,
 )
 from backend.services.appointment.services.appointment_service import appointment_service_instance
 from backend.services.appointment.schemas.appointment_schemas import (
@@ -255,6 +260,147 @@ class PatientService:
             is_walk_in=True,
             notes=request.notes or "Walk-in check-in",
         )
+
+    @staticmethod
+    def _calculate_age(dob: Optional[date]) -> Optional[int]:
+        if not dob:
+            return None
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    @staticmethod
+    def _mask_contact_info(phone: str, address: Optional[str]) -> Tuple[str, Optional[str]]:
+        clean_phone = phone.strip()
+        if len(clean_phone) >= 7:
+            prefix = clean_phone[:4]
+            suffix = clean_phone[-4:]
+            masked_phone = f"{prefix}***-**{suffix}"
+        else:
+            masked_phone = "***-***-****"
+
+        masked_address = None
+        if address:
+            parts = address.split(",", 1)
+            if len(parts) > 1:
+                masked_address = f"*** {parts[0].split()[-1] if parts[0].split() else 'Street'}, {parts[1].strip()}"
+            else:
+                masked_address = "*** Confidential Address"
+
+        return masked_phone, masked_address
+
+    def get_patient_profile(
+        self,
+        patient_id: str,
+        role: str = "Staff",
+        mask_sensitive: bool = False,
+    ) -> PatientProfileResponse:
+        patient = self.get_patient_by_id(patient_id)
+        age = self._calculate_age(patient.date_of_birth)
+
+        authorized_roles = {"administrator", "doctor", "staff", "receptionist", "nurse", "management"}
+        should_mask = mask_sensitive or (role.lower() not in authorized_roles)
+
+        disp_phone = patient.phone
+        disp_address = patient.address
+        if should_mask:
+            disp_phone, disp_address = self._mask_contact_info(patient.phone, patient.address)
+
+        all_apts = [a for a in self.appointment_service.repo.get_all() if a.patient_id == patient_id]
+
+        active_statuses = {
+            AppointmentStatus.SCHEDULED,
+            AppointmentStatus.CHECKED_IN,
+            AppointmentStatus.IN_CONSULTATION,
+        }
+
+        active_appointments: List[VisitHistoryItem] = []
+        visit_history: List[VisitHistoryItem] = []
+        token_history: List[TokenHistoryItem] = []
+
+        for apt in sorted(all_apts, key=lambda x: (x.appointment_date, x.appointment_time), reverse=True):
+            item = VisitHistoryItem(
+                appointment_id=apt.appointment_id,
+                appointment_date=apt.appointment_date,
+                appointment_time=apt.appointment_time,
+                doctor_id=apt.doctor_id,
+                doctor_name=apt.doctor_name,
+                department_id=apt.department_id,
+                department_name=apt.department_name,
+                status=apt.status.value,
+                priority=apt.priority,
+                is_walk_in=apt.is_walk_in,
+                booking_time=apt.timestamps.created_at,
+                check_in_time=apt.timestamps.check_in_time,
+                queue_entry_time=apt.timestamps.queue_entry_time,
+                consultation_start_time=apt.timestamps.consultation_start_time,
+                completion_time=apt.timestamps.consultation_end_time,
+                notes=apt.notes,
+            )
+
+            if apt.status in active_statuses:
+                active_appointments.append(item)
+            else:
+                visit_history.append(item)
+
+            if apt.token_number:
+                token_history.append(
+                    TokenHistoryItem(
+                        token_id=apt.token_id or f"TOK-{apt.token_number}",
+                        token_number=apt.token_number,
+                        appointment_id=apt.appointment_id,
+                        doctor_id=apt.doctor_id,
+                        doctor_name=apt.doctor_name,
+                        department_id=apt.department_id,
+                        department_name=apt.department_name,
+                        priority=apt.priority,
+                        status=apt.status.value,
+                        created_at=apt.timestamps.queue_entry_time or apt.timestamps.booking_time,
+                    )
+                )
+
+        audit_trail = self.repo.get_audit_trail(patient_id)
+
+        return PatientProfileResponse(
+            patient_id=patient.patient_id,
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            patient_name=patient.patient_name,
+            date_of_birth=patient.date_of_birth,
+            age=age,
+            gender=patient.gender,
+            phone=disp_phone,
+            address=disp_address,
+            status=patient.status,
+            created_at=patient.created_at,
+            last_arrival_time=patient.last_arrival_time,
+            is_masked=should_mask,
+            active_appointments=active_appointments,
+            visit_history=visit_history,
+            token_history=token_history,
+            audit_trail=audit_trail,
+        )
+
+    def update_patient_details(
+        self,
+        patient_id: str,
+        payload: PatientUpdateRequest,
+    ) -> Tuple[PatientResponse, List[PatientAuditRecord]]:
+        if payload.phone:
+            existing = self.repo.get_by_phone(payload.phone)
+            if existing and existing.patient_id != patient_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Phone number '{payload.phone}' is already registered to patient '{existing.patient_id}'",
+                )
+
+        updated_patient, audits = self.repo.update_patient(patient_id, payload)
+        if not updated_patient:
+            raise HTTPException(status_code=404, detail=f"Patient '{patient_id}' not found")
+        return updated_patient, audits
+
+    def get_patient_audit_trail(self, patient_id: str) -> List[PatientAuditRecord]:
+        self.get_patient_by_id(patient_id)
+        return self.repo.get_audit_trail(patient_id)
 
 
 patient_service_instance = PatientService()

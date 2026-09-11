@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Header, Query, status
 from backend.common.schemas.response import APIResponse
 from backend.services.patient.schemas.patient_schemas import (
     EligibleCheckInItem,
@@ -7,6 +7,9 @@ from backend.services.patient.schemas.patient_schemas import (
     PatientCheckInResponse,
     PatientCreate,
     PatientResponse,
+    PatientProfileResponse,
+    PatientUpdateRequest,
+    PatientAuditRecord,
 )
 from backend.services.patient.services.patient_service import patient_service_instance
 
@@ -65,3 +68,44 @@ def register_patient(payload: PatientCreate):
     """
     new_patient = patient_service_instance.create_patient(payload)
     return APIResponse.ok(data=new_patient, message=f"Patient '{new_patient.patient_name}' registered successfully")
+
+
+@router.get("/{patient_id}/profile", response_model=APIResponse[PatientProfileResponse])
+def get_patient_profile(
+    patient_id: str,
+    mask_sensitive: bool = Query(False, description="Whether to mask phone number and address"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role", description="Staff role for authorization"),
+):
+    """
+    Retrieve comprehensive patient profile including active appointments, visit history,
+    token history, and operational timestamps. Supports role-based privacy masking.
+    """
+    role = x_user_role or "Staff"
+    profile = patient_service_instance.get_patient_profile(
+        patient_id=patient_id,
+        role=role,
+        mask_sensitive=mask_sensitive,
+    )
+    return APIResponse.ok(data=profile, message="Patient profile retrieved successfully")
+
+
+@router.put("/{patient_id}", response_model=APIResponse[PatientResponse])
+def update_patient_details(patient_id: str, payload: PatientUpdateRequest):
+    """
+    Update demographic and contact information with field-level audit trail.
+    """
+    updated_patient, audits = patient_service_instance.update_patient_details(patient_id, payload)
+    return APIResponse.ok(
+        data=updated_patient,
+        message=f"Patient '{updated_patient.patient_name}' updated successfully ({len(audits)} field(s) modified)",
+    )
+
+
+@router.get("/{patient_id}/audit", response_model=APIResponse[List[PatientAuditRecord]])
+def get_patient_audit_history(patient_id: str):
+    """
+    Retrieve demographic modification audit trail for a patient.
+    """
+    audits = patient_service_instance.get_patient_audit_trail(patient_id)
+    return APIResponse.ok(data=audits, message="Patient audit trail retrieved successfully")
+
