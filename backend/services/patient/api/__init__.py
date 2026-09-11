@@ -1,0 +1,3 @@
+from backend.services.patient.api.patient_router import router as patient_router
+
+__all__ = ["patient_router"]
