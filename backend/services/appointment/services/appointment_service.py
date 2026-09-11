@@ -111,9 +111,16 @@ class AppointmentService:
         return apt.history
 
     def create_appointment(self, payload: AppointmentCreate) -> AppointmentResponse:
-        # Validate patient name
-        if not payload.patient_name or not payload.patient_name.strip():
-            raise HTTPException(status_code=400, detail="Patient name is required.")
+        if not payload.patient_id or not payload.patient_id.strip():
+            raise HTTPException(status_code=400, detail="Patient ID is required.")
+            
+        from backend.services.patient.services.patient_service import patient_service_instance
+        try:
+            patient = patient_service_instance.get_patient_by_id(payload.patient_id.strip())
+        except HTTPException:
+            raise HTTPException(status_code=400, detail=f"Patient ID '{payload.patient_id}' not found. Only registered patients can book appointments.")
+            
+        patient_name = patient.patient_name or f"{patient.first_name} {patient.last_name}".strip()
 
         # Validate doctor
         doctor = next((d for d in DOCTORS if d["doctor_id"] == payload.doctor_id), None)
@@ -140,14 +147,14 @@ class AppointmentService:
 
         # Generate unique IDs
         apt_id = self.repo.get_next_appointment_id()
-        patient_id = payload.patient_id.strip() if (payload.patient_id and payload.patient_id.strip()) else self.repo.get_next_patient_id()
+        patient_id = patient.patient_id
         staff_id = payload.staff_id.strip() if (payload.staff_id and payload.staff_id.strip()) else "Staff Member"
         now = datetime.utcnow()
 
         new_appointment = AppointmentResponse(
             appointment_id=apt_id,
             patient_id=patient_id,
-            patient_name=payload.patient_name.strip(),
+            patient_name=patient_name,
             doctor_id=payload.doctor_id,
             doctor_name=doctor["doctor_name"],
             department_id=department["department_id"],
@@ -182,7 +189,7 @@ class AppointmentService:
             appointment_date=payload.appointment_date,
             slot_time=payload.appointment_time.strip(),
             appointment_id=apt_id,
-            patient_name=payload.patient_name.strip(),
+            patient_name=patient_name,
         )
         return saved_apt
 

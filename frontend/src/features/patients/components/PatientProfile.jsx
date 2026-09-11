@@ -3,16 +3,7 @@ import PropTypes from 'prop-types';
 import { patientService } from '../services/patientService';
 import '../patients.css';
 
-const DEFAULT_PATIENTS = [
-  { id: 'PAT-001', name: 'James Wilson' },
-  { id: 'PAT-002', name: 'Michael Chen' },
-  { id: 'PAT-003', name: 'Elena Rodriguez' },
-  { id: 'PAT-004', name: 'Robert Taylor' },
-  { id: 'PAT-005', name: 'Sophia Martinez' },
-  { id: 'PAT-006', name: 'David Kim' },
-];
-
-const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
+const PatientProfile = ({ initialPatientId = null }) => {
   const [selectedPatientId, setSelectedPatientId] = useState(initialPatientId);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +14,20 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [maskSensitive, setMaskSensitive] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history' | 'tokens' | 'audit'
+
+  const [allPatients, setAllPatients] = useState([]);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const results = await patientService.searchPatients('');
+        setAllPatients(results || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchAll();
+  }, []);
 
   // Edit Demographics Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -36,6 +41,11 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const fetchProfile = async (patientId, masked = maskSensitive) => {
+    if (!patientId) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
@@ -284,32 +294,49 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
           )}
         </div>
 
-        {/* Quick patient selector buttons */}
-        <div className="patient-quick-list">
-          {DEFAULT_PATIENTS.map(p => (
+        {selectedPatientId && (
+          <div style={{ marginTop: '0.5rem' }}>
             <button
-              key={p.id}
-              className={`patient-quick-btn ${selectedPatientId === p.id ? 'active' : ''}`}
-              onClick={() => handleSelectPatient(p.id)}
+              className="btn btn-outline"
+              onClick={() => { setSelectedPatientId(null); setProfile(null); }}
+              style={{ fontSize: '0.8125rem', padding: '0.35rem 0.75rem' }}
             >
-              {p.name} ({p.id})
+              &larr; Back to Patient List
             </button>
-          ))}
-          {!DEFAULT_PATIENTS.some(p => p.id === selectedPatientId) && profile && (
-            <button
-              key={selectedPatientId}
-              className="patient-quick-btn active"
-              onClick={() => handleSelectPatient(selectedPatientId)}
-            >
-              {profile.patient_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Selected Patient'} ({selectedPatientId})
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
           Loading patient profile record...
+        </div>
+      ) : !selectedPatientId ? (
+        <div className="checkin-table-wrapper" style={{ marginTop: '1rem' }}>
+          <table className="checkin-table">
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Full Name</th>
+                <th>Phone</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allPatients.length === 0 ? (
+                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>No patients found.</td></tr>
+              ) : (
+                allPatients.map(p => (
+                  <tr key={p.patient_id} onClick={() => handleSelectPatient(p.patient_id)} style={{ cursor: 'pointer' }}>
+                    <td><strong>{p.patient_id}</strong></td>
+                    <td>{p.patient_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown'}</td>
+                    <td>{p.phone || 'N/A'}</td>
+                    <td><span className="badge-normal">{p.status || 'Registered'}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       ) : !profile ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>

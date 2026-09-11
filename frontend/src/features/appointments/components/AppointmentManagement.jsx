@@ -148,7 +148,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
   const [bookingSlots, setBookingSlots] = useState([]);
   const [loadingBookingSlots, setLoadingBookingSlots] = useState(false);
   const [bookingForm, setBookingForm] = useState({
-    patientName: '',
+    patientId: '',
     departmentId: '',
     doctorId: '',
     appointmentDate: '',
@@ -438,7 +438,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
     const defaultDoc = docsInDept[0]?.doctor_id || metadata.doctors?.[0]?.doctor_id || 'DOC-001';
 
     setBookingForm({
-      patientName: '',
+      patientId: '',
       departmentId: defaultDept,
       doctorId: defaultDoc,
       appointmentDate: todayStr,
@@ -508,8 +508,8 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
 
   // Execute Appointment Booking
   const handleExecuteBooking = async () => {
-    if (!bookingForm.patientName.trim()) {
-      showNotification('Patient name is required.', 'error');
+    if (!bookingForm.patientId.trim()) {
+      showNotification('Patient ID is required.', 'error');
       return;
     }
     if (!bookingForm.departmentId) {
@@ -532,7 +532,8 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
     setBooking(true);
     try {
       const newApt = await createAppointment({
-        patient_name: bookingForm.patientName.trim(),
+        patient_id: bookingForm.patientId.trim(),
+        patient_name: "Lookup Pending",
         department_id: bookingForm.departmentId,
         doctor_id: bookingForm.doctorId,
         appointment_date: bookingForm.appointmentDate,
@@ -608,7 +609,9 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
   const noShowCount = displayedAppointments.filter((a) => a.status === 'No-Show').length;
 
   const tableHeaders = [
-    'Patient & Token',
+    'Patient Name',
+    'Patient ID',
+    'Token & Details',
     'Doctor & Dept',
     'Schedule',
     'Status',
@@ -687,9 +690,9 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
 
       {/* Cancellation & Completion Intelligence Card */}
       {statistics && (
-        <Card className="stats-intelligence-card" id="cancellation-statistics-panel">
+        <Card className="stats-intelligence-card" id="cancellation-statistics-panel" style={{ marginBottom: '2.5rem' }}>
           <div className="stats-strip-container">
-            <div className="stats-metrics-group">
+            <div className="stats-metrics-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', width: '100%' }}>
               <div className="stat-pill-metric">
                 <span className="stat-pill-label">Completion Rate</span>
                 <div className="stat-pill-value-row">
@@ -738,7 +741,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
       )}
 
       {/* KPI Metrics Strip */}
-      <div className="kpi-grid">
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', width: '100%', marginBottom: '2.5rem' }}>
         <div className="kpi-card">
           <div className="kpi-label">Filtered Appointments</div>
           <div className="kpi-value">{totalCount}</div>
@@ -769,7 +772,7 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
       </div>
 
       {/* Filter & Search Section using common Card & Button */}
-      <Card className="filter-card-container" id="appointment-filters-section">
+      <Card className="filter-card-container" id="appointment-filters-section" style={{ marginBottom: '2.5rem' }}>
         <div className="filter-header">
           <div className="filter-title-wrap">
             <h3 className="filter-heading">Search & Filter Appointments</h3>
@@ -923,25 +926,34 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
 
                 return (
                   <tr key={apt.appointment_id} className={`apt-row status-row-${apt.status.toLowerCase()}`}>
-                    {/* Patient & Token */}
+                    {/* Patient Name */}
                     <td className="td-patient-token">
                       <div className="patient-name-text">{apt.patient_name}</div>
-                      <div className="patient-meta-row">
-                        <span className="apt-id-code">{apt.appointment_id}</span>
-                        {apt.token_number ? (
-                          <span className="token-tag">Token #{apt.token_number}</span>
-                        ) : (
-                          <span className="no-token-tag">No Token</span>
-                        )}
-                        {apt.priority === 'Emergency' && (
-                          <Badge text="EMERGENCY" variant="danger" className="badge-priority-sm" />
-                        )}
-                        {apt.priority === 'Senior' && (
-                          <Badge text="SENIOR" variant="warning" className="badge-priority-sm" />
-                        )}
-                        {apt.is_walk_in && (
-                          <Badge text="Walk-In" variant="primary" className="badge-priority-sm" style={{ backgroundColor: '#17a2b8' }} />
-                        )}
+                    </td>
+                    {/* Patient ID */}
+                    <td>
+                      <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>{apt.patient_id}</span>
+                    </td>
+                    {/* Token & Details */}
+                    <td>
+                      <div className="patient-meta-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className="apt-id-code" style={{ marginBottom: 0 }}>{apt.appointment_id}</span>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {apt.token_number ? (
+                            <span className="token-tag">Token #{apt.token_number}</span>
+                          ) : (
+                            <span className="no-token-tag">No Token</span>
+                          )}
+                          {apt.priority === 'Emergency' && (
+                            <Badge text="EMERGENCY" variant="danger" className="badge-priority-sm" />
+                          )}
+                          {apt.priority === 'Senior' && (
+                            <Badge text="SENIOR" variant="warning" className="badge-priority-sm" />
+                          )}
+                          {apt.is_walk_in && (
+                            <Badge text="Walk-In" variant="primary" className="badge-priority-sm" style={{ backgroundColor: '#17a2b8' }} />
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -1622,14 +1634,14 @@ const AppointmentManagement = ({ defaultStaffId = 'STF-001', refreshTrigger = 0 
         }
       >
         <div className="cancel-form-grid">
-          {/* Patient Name */}
+          {/* Patient ID */}
           <div className="cancel-field-group">
             <Input
-              label="Patient Full Name *"
-              name="patientName"
-              placeholder="e.g. John Doe"
-              value={bookingForm.patientName}
-              onChange={(e) => setBookingForm({ ...bookingForm, patientName: e.target.value })}
+              label="Patient ID *"
+              name="patientId"
+              placeholder="e.g. PAT-001"
+              value={bookingForm.patientId}
+              onChange={(e) => setBookingForm({ ...bookingForm, patientId: e.target.value.toUpperCase() })}
             />
           </div>
 

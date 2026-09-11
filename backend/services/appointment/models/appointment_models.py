@@ -44,9 +44,16 @@ class AppointmentRepository:
             gap = 30
             if dept_info and "avg_consultation_time" in dept_info:
                 gap = int(dept_info["avg_consultation_time"])
+                
+            working_days = [0, 1, 2, 3, 4]
+            # Set weekend coverage for newly added doctors
+            if doc["doctor_id"] in ["DOC-006", "DOC-007", "DOC-008", "DOC-009", "DOC-010"]:
+                working_days = [5, 6]
+                
             self._doctor_schedules[doc["doctor_id"]] = ScheduleConfig(
                 doctor_id=doc["doctor_id"],
-                slot_duration_minutes=gap
+                slot_duration_minutes=gap,
+                working_days=working_days
             )
 
     def get_schedule(self, doctor_id: str) -> Optional[ScheduleConfig]:
@@ -119,7 +126,7 @@ class AppointmentRepository:
         appointment_date: Optional[date] = None,
     ) -> List[SlotInventoryItem]:
         target_date = appointment_date or date.today()
-        doctors_to_query = [d["doctor_id"] for d in DOCTORS] if not doctor_id else [doctor_id]
+        doctors_to_query = [d["doctor_id"] for d in DOCTORS] if not doctor_id or doctor_id == "All" else [doctor_id]
 
         items: List[SlotInventoryItem] = []
         for doc in doctors_to_query:

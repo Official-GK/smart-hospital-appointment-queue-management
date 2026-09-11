@@ -8,15 +8,23 @@ const StaffLayout = ({ children, activeTab = 'Dashboard', onTabChange = () => {}
         <div className="header-brand">Smart Hospital Admin</div>
         <div className="header-user" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span>Staff Member</span>
-          <button style={{ 
-            background: 'none', 
-            border: '1px solid var(--border-color)', 
-            padding: '0.25rem 0.75rem', 
-            borderRadius: 'var(--radius-md)',
+          <button 
+            onClick={() => window.location.href = '/'}
+            style={{ 
+            background: '#f8fafc', 
+            border: '1px solid #cbd5e1', 
+            padding: '0.375rem 1rem', 
+            borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '0.875rem',
-            color: 'var(--text-muted)'
+            fontWeight: '500',
+            color: '#475569',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
           }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             Logout
           </button>
         </div>

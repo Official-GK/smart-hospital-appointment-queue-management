@@ -6,7 +6,6 @@ from backend.services.queue.api import queue_router
 from backend.services.audit.api import audit_router
 from backend.services.auth.api.auth_router import router as auth_router
 from backend.services.user.api.user_router import router as user_router
-from backend.services.queue.api.queue_router import router as queue_router
 from backend.services.patient.api.patient_router import router as patient_router
 
 app = FastAPI(
@@ -47,7 +46,6 @@ app.include_router(appointment_router)
 app.include_router(queue_router.router)
 app.include_router(audit_router.router)
 app.include_router(user_router)
-app.include_router(queue_router)
 app.include_router(patient_router)
 
 

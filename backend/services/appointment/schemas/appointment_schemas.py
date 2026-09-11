@@ -64,8 +64,8 @@ class AppointmentRescheduleRequest(BaseModel):
 
 
 class AppointmentCreate(BaseModel):
-    patient_id: Optional[str] = None
-    patient_name: str
+    patient_id: str
+    patient_name: Optional[str] = None
     doctor_id: str
     department_id: str
     appointment_date: date
