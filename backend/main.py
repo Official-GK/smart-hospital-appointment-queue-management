@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend.services.appointment.api.appointment_router import router as appointment_router
 from backend.services.queue.api.queue_router import router as queue_router
+from backend.services.patient.api.patient_router import router as patient_router
 
 app = FastAPI(
     title="Smart Hospital API",
@@ -36,6 +37,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Include domain routers
 app.include_router(appointment_router)
 app.include_router(queue_router)
+app.include_router(patient_router)
 
 
 @app.get("/health")
