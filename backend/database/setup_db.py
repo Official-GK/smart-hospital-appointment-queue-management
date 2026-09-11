@@ -116,6 +116,59 @@ def setup_tokens_schema_and_seed(db_user, db_password):
         cur.execute(create_table_sql)
         logger.info("'tokens' table is ready.")
 
+        logger.info("Ensuring 'users' table exists...")
+        create_users_table_sql = """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id VARCHAR(50) PRIMARY KEY,
+            employee_id VARCHAR(50) UNIQUE NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            hashed_password VARCHAR(255) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+        cur.execute(create_users_table_sql)
+        logger.info("'users' table is ready.")
+
+        logger.info("Ensuring 'audit_logs' table exists...")
+        create_audit_logs_table_sql = """
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            log_id UUID PRIMARY KEY,
+            employee_id VARCHAR(50) NOT NULL,
+            action VARCHAR(50) NOT NULL,
+            details JSONB,
+            ip_address VARCHAR(50),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_employee_id ON audit_logs(employee_id);
+        """
+        cur.execute(create_audit_logs_table_sql)
+        logger.info("'audit_logs' table is ready.")
+
+        # Seed temporary users
+        logger.info("Seeding temporary admin and staff users...")
+        try:
+            from passlib.context import CryptContext
+            import uuid
+            
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            admin_pwd = pwd_context.hash("admin123")
+            staff_pwd = pwd_context.hash("staff123")
+
+            seed_users_sql = """
+            INSERT INTO users (user_id, employee_id, role, hashed_password)
+            VALUES 
+                (%s, 'ADMIN-001', 'admin', %s),
+                (%s, 'STAFF-001', 'staff', %s)
+            ON CONFLICT (employee_id) DO NOTHING;
+            """
+            cur.execute(seed_users_sql, (str(uuid.uuid4()), admin_pwd, str(uuid.uuid4()), staff_pwd))
+            logger.info("Seeded temporary users successfully.")
+        except Exception as e:
+            logger.error(f"Failed to seed temporary users: {e}")
+
         cur.close()
         conn.close()
         logger.info("Database schema is ready. No demo tokens seeded (awaiting external configuration).")
