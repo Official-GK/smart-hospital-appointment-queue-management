@@ -3,6 +3,7 @@ from fastapi import APIRouter, Header, Query, status
 from backend.common.schemas.response import APIResponse
 from backend.services.patient.schemas.patient_schemas import (
     EligibleCheckInItem,
+    DuplicateCheckResponse,
     PatientCheckInRequest,
     PatientCheckInResponse,
     PatientCreate,
@@ -38,6 +39,18 @@ def get_eligible_check_ins():
     """
     eligible = patient_service_instance.get_eligible_check_ins()
     return APIResponse.ok(data=eligible, message="Eligible check-in appointments retrieved successfully")
+
+
+@router.get("/check-duplicate", response_model=APIResponse[DuplicateCheckResponse])
+def check_duplicate_patient(
+    contact_number: Optional[str] = Query(None, description="Phone or contact number to verify"),
+    identifier: Optional[str] = Query(None, description="Patient identifier or ID to verify"),
+):
+    """
+    Pre-flight duplicate check to verify if a contact number or identifier already exists.
+    """
+    dup = patient_service_instance.check_duplicate(phone=contact_number, identifier=identifier)
+    return APIResponse.ok(data=dup, message="Duplicate check completed")
 
 
 @router.get("", response_model=APIResponse[List[PatientResponse]])

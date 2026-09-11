@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from backend.services.patient.models.patient_models import PatientRepository
 from backend.services.patient.schemas.patient_schemas import (
     EligibleCheckInItem,
+    DuplicateCheckResponse,
     PatientCheckInRequest,
     PatientCheckInResponse,
     PatientCreate,
@@ -53,11 +54,44 @@ class PatientService:
     def search_patients(self, query: str) -> List[PatientResponse]:
         return self.repo.search(query)
 
+    def check_duplicate(
+        self,
+        phone: Optional[str] = None,
+        identifier: Optional[str] = None,
+    ) -> DuplicateCheckResponse:
+        """
+        Pre-flight duplicate check based on contact number or identifier.
+        """
+        result = self.repo.check_duplicate(phone=phone, identifier=identifier)
+        if result:
+            existing, matched_field = result
+            field_label = "Contact number" if matched_field == "contact_number" else "Identifier"
+            return DuplicateCheckResponse(
+                is_duplicate=True,
+                existing_patient_id=existing.patient_id,
+                existing_patient_name=existing.patient_name,
+                matched_field=matched_field,
+                message=f"{field_label} is already registered to {existing.patient_name} ({existing.patient_id})",
+            )
+        return DuplicateCheckResponse(
+            is_duplicate=False,
+            message="No duplicate patient record found",
+        )
+
     def create_patient(self, payload: PatientCreate) -> PatientResponse:
-        # Check duplicate phone
-        existing = self.repo.get_by_phone(payload.phone)
-        if existing:
-            raise HTTPException(status_code=409, detail=f"Patient with phone '{payload.phone}' already exists: {existing.patient_id}")
+        # Check duplicate by contact number or identifier
+        dup_check = self.repo.check_duplicate(
+            phone=payload.phone,
+            identifier=payload.identifier,
+        )
+        if dup_check:
+            existing, matched_field = dup_check
+            field_label = "Contact number" if matched_field == "contact_number" else "Identifier"
+            matched_value = payload.phone if matched_field == "contact_number" else payload.identifier
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate registration: {field_label} '{matched_value}' is already registered to {existing.patient_name} ({existing.patient_id})",
+            )
         return self.repo.create(payload)
 
     def get_eligible_check_ins(self) -> List[EligibleCheckInItem]:

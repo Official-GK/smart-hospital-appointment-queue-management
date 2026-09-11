@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Gender(str, Enum):
@@ -25,13 +25,67 @@ class PatientBase(BaseModel):
     first_name: str
     last_name: str
     date_of_birth: Optional[date] = None
+    age: Optional[int] = None
     gender: Optional[str] = "Other"
     phone: str
     address: Optional[str] = None
 
 
-class PatientCreate(PatientBase):
-    pass
+class PatientCreate(BaseModel):
+    """
+    Payload for front-desk patient registration
+    """
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    name: Optional[str] = None
+    age: Optional[int] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = "Other"
+    phone: Optional[str] = None
+    contact_number: Optional[str] = None
+    address: Optional[str] = None
+    identifier: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_and_normalize(self):
+        # Resolve names
+        if not self.first_name and not self.name:
+            raise ValueError("Patient first name or full name is required")
+        if not self.first_name and self.name:
+            parts = self.name.strip().split(" ", 1)
+            self.first_name = parts[0]
+            if not self.last_name:
+                self.last_name = parts[1] if len(parts) > 1 else ""
+        if not self.last_name:
+            self.last_name = ""
+
+        # Resolve contact number
+        resolved_phone = self.phone or self.contact_number
+        if not resolved_phone or not resolved_phone.strip():
+            raise ValueError("Contact number (phone) is required")
+        self.phone = resolved_phone.strip()
+
+        # Compute age or date_of_birth if only one is provided
+        if self.age is not None and self.date_of_birth is None:
+            today = date.today()
+            self.date_of_birth = date(today.year - self.age, 1, 1)
+        elif self.date_of_birth is not None and self.age is None:
+            today = date.today()
+            dob = self.date_of_birth
+            self.age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+        return self
+
+
+class DuplicateCheckResponse(BaseModel):
+    """
+    Response model for pre-flight duplicate registration checks
+    """
+    is_duplicate: bool
+    existing_patient_id: Optional[str] = None
+    existing_patient_name: Optional[str] = None
+    matched_field: Optional[str] = None
+    message: str
 
 
 class PatientResponse(PatientBase):
