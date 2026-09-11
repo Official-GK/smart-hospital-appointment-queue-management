@@ -179,8 +179,9 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
           <button
             onClick={() => setError(null)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: '#991b1b' }}
+            aria-label="Close"
           >
-            ✕
+            Close
           </button>
         </div>
       )}
@@ -271,9 +272,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
                           {processingId === item.appointment_id ? (
                             'Checking In...'
                           ) : (
-                            <>
-                              <span>✓</span> Check In
-                            </>
+                            'Check In'
                           )}
                         </button>
                       </td>
@@ -355,7 +354,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
                   onChange={(e) => setWalkinPriority(e.target.value)}
                 >
                   <option value="Normal">Normal Priority</option>
-                  <option value="Emergency">🚨 Emergency (Immediate Triage)</option>
+                  <option value="Emergency">Emergency (Immediate Triage)</option>
                 </select>
               </div>
 
@@ -378,7 +377,7 @@ const PatientCheckIn = ({ onCheckInSuccess = () => {} }) => {
                 style={{ padding: '0.625rem 1.5rem', fontSize: '0.875rem' }}
                 disabled={walkinSubmitting}
               >
-                {walkinSubmitting ? 'Checking In...' : '✓ Check In Walk-In Patient'}
+                {walkinSubmitting ? 'Checking In...' : 'Check In Walk-In Patient'}
               </button>
             </div>
           </form>
