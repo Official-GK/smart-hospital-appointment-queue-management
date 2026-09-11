@@ -1,18 +1,10 @@
 import React, { useState } from 'react';
-import { PatientCheckIn, PatientProfile, PatientRegistration } from './features/patients';
-import QueueDashboard from './features/queue/components/QueueDashboard';
+import { PatientProfile, PatientRegistration } from './features/patients';
 import StaffDashboard from './pages/StaffDashboard';
 import './App.css';
 
 const Temp = () => {
-  const [view, setView] = useState('registration'); // 'registration' | 'checkin' | 'profile' | 'split' | 'dashboard'
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const handleCheckInSuccess = (receipt) => {
-    console.log('Check-in success receipt:', receipt);
-    // Increment refresh key to trigger live queue refresh
-    setRefreshKey(prev => prev + 1);
-  };
+  const [view, setView] = useState('registration'); // 'registration' | 'profile' | 'dashboard'
 
   const handleRegistrationSuccess = (patient) => {
     console.log('Patient registered successfully:', patient);
@@ -56,21 +48,6 @@ const Temp = () => {
             Register Patient
           </button>
           <button
-            onClick={() => setView('checkin')}
-            style={{
-              background: view === 'checkin' ? '#2563eb' : '#334155',
-              color: '#ffffff',
-              border: 'none',
-              padding: '0.4rem 0.9rem',
-              borderRadius: '6px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Patient Check-In
-          </button>
-          <button
             onClick={() => setView('profile')}
             style={{
               background: view === 'profile' ? '#2563eb' : '#334155',
@@ -84,21 +61,6 @@ const Temp = () => {
             }}
           >
             Patient Profile
-          </button>
-          <button
-            onClick={() => setView('split')}
-            style={{
-              background: view === 'split' ? '#2563eb' : '#334155',
-              color: '#ffffff',
-              border: 'none',
-              padding: '0.4rem 0.9rem',
-              borderRadius: '6px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Side-by-Side (Check-In + Queue)
           </button>
           <button
             onClick={() => setView('dashboard')}
@@ -123,73 +85,15 @@ const Temp = () => {
         <main style={{ maxWidth: '900px', margin: '2rem auto', padding: '0 1.5rem' }}>
           <PatientRegistration
             onRegistrationSuccess={handleRegistrationSuccess}
-            onCheckInPatient={() => setView('checkin')}
+            onCheckInPatient={() => setView('dashboard')}
             onViewProfile={() => setView('profile')}
           />
-        </main>
-      )}
-
-      {view === 'checkin' && (
-        <main style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 1.5rem' }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            marginBottom: '2rem'
-          }}>
-            <PatientCheckIn onCheckInSuccess={handleCheckInSuccess} />
-          </div>
-
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.125rem', color: '#1e293b' }}>
-              Live Active Queue (Auto-Updates upon Check-In)
-            </h3>
-            <QueueDashboard key={refreshKey} />
-          </div>
         </main>
       )}
 
       {view === 'profile' && (
         <main style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 1.5rem' }}>
           <PatientProfile />
-        </main>
-      )}
-
-      {view === 'split' && (
-        <main style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
-          gap: '1.5rem',
-          margin: '1.5rem',
-          alignItems: 'start'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <PatientCheckIn onCheckInSuccess={handleCheckInSuccess} />
-          </div>
-
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <QueueDashboard key={refreshKey} />
-          </div>
         </main>
       )}
 
