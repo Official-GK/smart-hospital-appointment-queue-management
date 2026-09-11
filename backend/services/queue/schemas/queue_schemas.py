@@ -14,9 +14,13 @@ class QueueStatus(str, Enum):
 
 
 class QueuePriority(str, Enum):
+    EMERGENCY = "Emergency"
+    SENIOR_CITIZEN = "Senior Citizen"
+    VIP = "VIP"
+    SCHEDULED = "Scheduled"
+    WALK_IN = "Walk-in"
     NORMAL = "Normal"
     SENIOR = "Senior"
-    EMERGENCY = "Emergency"
 
 
 class QueueToken(BaseModel):
@@ -32,6 +36,8 @@ class QueueToken(BaseModel):
     priority: QueuePriority = QueuePriority.NORMAL
     status: QueueStatus = QueueStatus.WAITING
     is_walk_in: bool = False
+    is_manually_elevated: bool = False
+    elevation_reason: Optional[str] = None
     queue_entry_time: datetime = Field(default_factory=datetime.utcnow)
     called_time: Optional[datetime] = None
     consultation_start_time: Optional[datetime] = None
@@ -41,3 +47,4 @@ class QueueToken(BaseModel):
 
 class QueueStatusUpdateRequest(BaseModel):
     status: QueueStatus
+
