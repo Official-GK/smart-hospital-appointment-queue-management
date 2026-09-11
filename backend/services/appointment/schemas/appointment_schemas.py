@@ -71,6 +71,7 @@ class AppointmentCreate(BaseModel):
     appointment_date: date
     appointment_time: str
     priority: str = "Normal"
+    is_walk_in: bool = False
     notes: Optional[str] = None
     staff_id: Optional[str] = "Staff Member"
 
@@ -93,6 +94,7 @@ class AppointmentResponse(BaseModel):
     appointment_time: str
     status: AppointmentStatus
     priority: str = "Normal"
+    is_walk_in: bool = False
     token_id: Optional[str] = None
     token_number: Optional[str] = None
     timestamps: OperationalTimestamps
@@ -138,3 +140,28 @@ class FilterMetadata(BaseModel):
         "Duplicate Booking",
         "Other",
     ]
+
+
+class BlockedTime(BaseModel):
+    block_id: str
+    doctor_id: str
+    start_time: datetime
+    end_time: datetime
+    reason: str
+
+
+class ScheduleConfig(BaseModel):
+    doctor_id: str
+    working_days: List[int] = [0, 1, 2, 3, 4]  # 0=Monday, 4=Friday
+    shift_start: str = "09:00 AM"
+    shift_end: str = "05:00 PM"
+    break_start: str = "01:00 PM"
+    break_end: str = "02:00 PM"
+    slot_duration_minutes: int = 30
+    blocked_times: List[BlockedTime] = Field(default_factory=list)
+
+
+class BlockTimeRequest(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    reason: str

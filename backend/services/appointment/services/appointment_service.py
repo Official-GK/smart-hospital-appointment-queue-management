@@ -14,6 +14,9 @@ from backend.services.appointment.schemas.appointment_schemas import (
     SlotInventoryItem,
     StatusAuditRecord,
     StatusTransitionRequest,
+    ScheduleConfig,
+    BlockedTime,
+    BlockTimeRequest,
 )
 from backend.database.token_fetcher import (
     fetch_token_by_appointment,
@@ -153,6 +156,7 @@ class AppointmentService:
             appointment_time=payload.appointment_time.strip(),
             status=AppointmentStatus.SCHEDULED,
             priority=payload.priority or "Normal",
+            is_walk_in=payload.is_walk_in,
             token_number=None,
             notes=payload.notes,
             timestamps=OperationalTimestamps(
@@ -412,6 +416,7 @@ class AppointmentService:
                 department_id=apt.department_id,
                 department_name=apt.department_name,
                 priority=priority,
+                is_walk_in=apt.is_walk_in,
             )
             apt.token_id = queue_token.token_id
             apt.token_number = queue_token.token_number
@@ -429,6 +434,7 @@ class AppointmentService:
                     "department_id": apt.department_id,
                     "department_name": apt.department_name,
                     "priority": priority.value,
+                    "is_walk_in": apt.is_walk_in,
                     "status": queue_token.status.value,
                     "created_at": queue_token.queue_entry_time,
                     "queue_entry_time": queue_token.queue_entry_time,
@@ -557,6 +563,28 @@ class AppointmentService:
             ],
         }
 
+    def get_schedule(self, doctor_id: str) -> ScheduleConfig:
+        schedule = self.repo.get_schedule(doctor_id)
+        if not schedule:
+            raise HTTPException(status_code=404, detail=f"Schedule for doctor '{doctor_id}' not found")
+        return schedule
+
+    def update_schedule(self, doctor_id: str, config: ScheduleConfig) -> ScheduleConfig:
+        return self.repo.update_schedule(doctor_id, config)
+
+    def add_blocked_time(self, doctor_id: str, request: BlockTimeRequest) -> ScheduleConfig:
+        schedule = self.get_schedule(doctor_id)
+        import uuid
+        block = BlockedTime(
+            block_id=f"BLK-{uuid.uuid4().hex[:6].upper()}",
+            doctor_id=doctor_id,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            reason=request.reason
+        )
+        return self.repo.add_blocked_time(doctor_id, block)
+
 
 appointment_service_instance = AppointmentService()
+
 
