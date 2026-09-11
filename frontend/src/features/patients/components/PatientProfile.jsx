@@ -20,6 +20,7 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
   const [successMsg, setSuccessMsg] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [maskSensitive, setMaskSensitive] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history' | 'tokens' | 'audit'
 
@@ -49,6 +50,12 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
   };
 
   useEffect(() => {
+    if (initialPatientId && initialPatientId !== selectedPatientId) {
+      setSelectedPatientId(initialPatientId);
+    }
+  }, [initialPatientId]);
+
+  useEffect(() => {
     fetchProfile(selectedPatientId, maskSensitive);
   }, [selectedPatientId, maskSensitive]);
 
@@ -58,13 +65,32 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
     setSearchQuery(q);
     if (!q.trim()) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
     try {
+      setIsSearching(true);
       const results = await patientService.searchPatients(q);
       setSearchResults(results);
     } catch (err) {
       console.error('Search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (searchResults.length > 0) {
+        handleSelectPatient(searchResults[0].patient_id);
+      } else if (searchQuery.trim()) {
+        const qUpper = searchQuery.trim().toUpperCase();
+        if (qUpper.startsWith('PAT-')) {
+          handleSelectPatient(qUpper);
+        }
+      }
+    } else if (e.key === 'Escape') {
+      setSearchResults([]);
     }
   };
 
@@ -174,15 +200,40 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
       {/* Search Bar & Quick Selectors */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div className="checkin-search-bar" style={{ position: 'relative' }}>
-          <input
-            type="text"
-            className="checkin-search-input"
-            placeholder="Search patient by Name, Patient ID (e.g. PAT-001), or Phone Number..."
-            value={searchQuery}
-            onChange={handleSearch}
-          />
+          <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+            <input
+              type="text"
+              className="checkin-search-input"
+              style={{ width: '100%', paddingRight: searchQuery ? '2.5rem' : '1rem' }}
+              placeholder="Search patient by Name, Patient ID (e.g. PAT-001), or Phone Number..."
+              value={searchQuery}
+              onChange={handleSearch}
+              onKeyDown={handleKeyDown}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); }}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  padding: '0.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                aria-label="Clear search"
+              >
+                Clear
+              </button>
+            )}
+          </div>
 
-          {searchResults.length > 0 && (
+          {searchQuery.trim().length > 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -194,31 +245,41 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               zIndex: 30,
               marginTop: '4px',
-              maxHeight: '240px',
+              maxHeight: '260px',
               overflowY: 'auto'
             }}>
-              {searchResults.map((p) => (
-                <div
-                  key={p.patient_id}
-                  onClick={() => handleSelectPatient(p.patient_id)}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderBottom: '1px solid #f1f5f9',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
-                >
-                  <div>
-                    <strong>{p.patient_name}</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '0.5rem' }}>({p.patient_id})</span>
+              {searchResults.length > 0 ? (
+                searchResults.map((p) => (
+                  <div
+                    key={p.patient_id}
+                    onClick={() => handleSelectPatient(p.patient_id)}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      borderBottom: '1px solid #f1f5f9',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                  >
+                    <div>
+                      <strong>{p.patient_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Patient'}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '0.5rem' }}>({p.patient_id})</span>
+                    </div>
+                    <span style={{ fontSize: '0.8125rem', color: '#475569' }}>{p.phone}</span>
                   </div>
-                  <span style={{ fontSize: '0.8125rem', color: '#475569' }}>{p.phone}</span>
+                ))
+              ) : isSearching ? (
+                <div style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.875rem', textAlign: 'center' }}>
+                  Searching patients...
                 </div>
-              ))}
+              ) : searchQuery.trim().length >= 2 ? (
+                <div style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.875rem', textAlign: 'center' }}>
+                  No patients found matching "{searchQuery}".
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -234,6 +295,15 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
               {p.name} ({p.id})
             </button>
           ))}
+          {!DEFAULT_PATIENTS.some(p => p.id === selectedPatientId) && profile && (
+            <button
+              key={selectedPatientId}
+              className="patient-quick-btn active"
+              onClick={() => handleSelectPatient(selectedPatientId)}
+            >
+              {profile.patient_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Selected Patient'} ({selectedPatientId})
+            </button>
+          )}
         </div>
       </div>
 
@@ -252,10 +322,12 @@ const PatientProfile = ({ initialPatientId = 'PAT-001' }) => {
             <div className="profile-header-row">
               <div className="profile-identity">
                 <div className="profile-avatar-circle">
-                  {profile.first_name ? profile.first_name[0] : 'P'}
+                  {(profile.first_name || profile.patient_name || 'P').trim()[0].toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="profile-name">{profile.patient_name}</h3>
+                  <h3 className="profile-name">
+                    {profile.patient_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.name || 'Patient Record'}
+                  </h3>
                   <div className="profile-meta-tags">
                     <span className="profile-id-badge">ID: {profile.patient_id}</span>
                     <span className="badge-normal">{profile.gender || 'Not Specified'}</span>

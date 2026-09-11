@@ -1,5 +1,18 @@
 const API_BASE_URL = 'http://localhost:8000/api';
 
+const DEMO_PATIENT_RECORDS = [
+  { patient_id: 'PAT-001', patient_name: 'James Wilson', first_name: 'James', last_name: 'Wilson', phone: '+1-555-0101', address: '124 Oak Street, Springfield', date_of_birth: '1985-04-12', age: 41, gender: 'Male', status: 'Registered' },
+  { patient_id: 'PAT-002', patient_name: 'Michael Chen', first_name: 'Michael', last_name: 'Chen', phone: '+1-555-0102', address: '452 Elm Street, Springfield', date_of_birth: '1990-08-23', age: 36, gender: 'Male', status: 'Checked-In' },
+  { patient_id: 'PAT-003', patient_name: 'Elena Rodriguez', first_name: 'Elena', last_name: 'Rodriguez', phone: '+1-555-0103', address: '789 Pine Road, Springfield', date_of_birth: '1978-11-05', age: 47, gender: 'Female', status: 'In-Consultation' },
+  { patient_id: 'PAT-004', patient_name: 'Robert Taylor', first_name: 'Robert', last_name: 'Taylor', phone: '+1-555-0104', address: '321 Maple Avenue, Springfield', date_of_birth: '1965-02-17', age: 61, gender: 'Male', status: 'Completed' },
+  { patient_id: 'PAT-005', patient_name: 'Sophia Martinez', first_name: 'Sophia', last_name: 'Martinez', phone: '+1-555-0105', address: '654 Cedar Blvd, Springfield', date_of_birth: '1995-06-30', age: 31, gender: 'Female', status: 'Registered' },
+  { patient_id: 'PAT-006', patient_name: 'David Kim', first_name: 'David', last_name: 'Kim', phone: '+1-555-0106', address: '987 Birch Lane, Springfield', date_of_birth: '1988-09-14', age: 37, gender: 'Male', status: 'Registered' },
+  { patient_id: 'PAT-007', patient_name: 'Emily Watson', first_name: 'Emily', last_name: 'Watson', phone: '+1-555-0107', address: '150 Walnut Court, Springfield', date_of_birth: '1992-03-18', age: 34, gender: 'Female', status: 'Registered' },
+  { patient_id: 'PAT-008', patient_name: 'Alexander Wright', first_name: 'Alexander', last_name: 'Wright', phone: '+1-555-0108', address: '882 Cypress Drive, Springfield', date_of_birth: '1983-12-02', age: 42, gender: 'Male', status: 'Registered' },
+];
+
+const localRegisteredPatients = new Map();
+
 /**
  * Service handling patient check-in, arrival recording, and queue placement.
  * Supports direct patient router endpoints with graceful fallback to appointment/queue APIs.
@@ -210,12 +223,26 @@ export const patientService = {
       const res = await fetch(`${API_BASE_URL}/patients?query=${encodeURIComponent(query)}`);
       if (res.ok) {
         const json = await res.json();
-        return json.data || [];
+        if (json.data && json.data.length > 0) {
+          return json.data;
+        }
       }
     } catch (e) {
-      // Return empty if not available
+      // Fallback
     }
-    return [];
+
+    // Fallback: search across local registered cache and demo patients
+    const all = [
+      ...Array.from(localRegisteredPatients.values()),
+      ...DEMO_PATIENT_RECORDS,
+    ];
+    const qLower = (query || '').toLowerCase().trim();
+    if (!qLower) return all;
+    return all.filter(
+      p => (p.patient_name || '').toLowerCase().includes(qLower) ||
+           (p.patient_id || '').toLowerCase().includes(qLower) ||
+           (p.phone || '').includes(qLower)
+    );
   },
 
   /**
@@ -255,10 +282,12 @@ export const patientService = {
       // Fallback
     }
 
-    // Fallback: Assemble profile from appointments API and patient demographics
+    // Fallback: Assemble profile from demo/local patient and appointments
     try {
-      const aptsRes = await fetch(`${API_BASE_URL}/appointments`);
-      const allApts = aptsRes.ok ? (await aptsRes.json()).data || [] : [];
+      const cached = localRegisteredPatients.get(patientId) || DEMO_PATIENT_RECORDS.find(p => p.patient_id === patientId);
+
+      const aptsRes = await fetch(`${API_BASE_URL}/appointments`).catch(() => null);
+      const allApts = (aptsRes && aptsRes.ok) ? (await aptsRes.json()).data || [] : [];
       const patientApts = allApts.filter(a => a.patient_id === patientId);
 
       const activeStatuses = ['Scheduled', 'Checked-In', 'In-Consultation'];
@@ -308,28 +337,30 @@ export const patientService = {
         }
       });
 
-      const sampleName = patientApts[0]?.patient_name || 'Patient';
-      let phone = '+1-555-0101';
-      let address = '124 Oak Street, Springfield';
+      const sampleName = cached?.patient_name || (cached ? `${cached.first_name || ''} ${cached.last_name || ''}`.trim() : null) || patientApts[0]?.patient_name || 'James Wilson';
+      const sampleFirst = cached?.first_name || sampleName.split(' ')[0] || 'James';
+      const sampleLast = cached?.last_name || sampleName.split(' ')[1] || 'Wilson';
+      let phone = cached?.phone || '+1-555-0101';
+      let address = cached?.address || '124 Oak Street, Springfield';
 
       if (maskSensitive) {
-        phone = '+1-5***-**0101';
+        phone = phone.length >= 7 ? `${phone.slice(0, 4)}***-**${phone.slice(-4)}` : '***-***-****';
         address = '*** Oak Street, Springfield';
       }
 
       return {
         patient_id: patientId,
-        first_name: sampleName.split(' ')[0] || 'Patient',
-        last_name: sampleName.split(' ')[1] || 'User',
+        first_name: sampleFirst,
+        last_name: sampleLast,
         patient_name: sampleName,
-        date_of_birth: '1985-04-12',
-        age: 41,
-        gender: 'Male',
+        date_of_birth: cached?.date_of_birth || '1985-04-12',
+        age: cached?.age || 41,
+        gender: cached?.gender || 'Male',
         phone,
         address,
-        status: 'Registered',
-        created_at: '2026-08-01T09:00:00Z',
-        last_arrival_time: null,
+        status: cached?.status || 'Registered',
+        created_at: cached?.created_at || '2026-08-01T09:00:00Z',
+        last_arrival_time: cached?.last_arrival_time || null,
         is_masked: Boolean(maskSensitive),
         active_appointments: active,
         visit_history: visits,
@@ -448,6 +479,9 @@ export const patientService = {
 
       if (res.ok) {
         const json = await res.json();
+        if (json.data && json.data.patient_id) {
+          localRegisteredPatients.set(json.data.patient_id, json.data);
+        }
         return json.data;
       }
 
@@ -468,7 +502,7 @@ export const patientService = {
     const patientId = `PAT-${Math.floor(100 + Math.random() * 900)}`;
     const phone = payload.phone || payload.contact_number || '+1-555-0199';
 
-    return {
+    const fallbackPatient = {
       patient_id: patientId,
       first_name: payload.first_name || fullName.split(' ')[0],
       last_name: payload.last_name || fullName.split(' ')[1] || '',
@@ -481,6 +515,8 @@ export const patientService = {
       status: 'Registered',
       created_at: new Date().toISOString(),
     };
+    localRegisteredPatients.set(patientId, fallbackPatient);
+    return fallbackPatient;
   },
 };
 
